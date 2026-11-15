@@ -1,0 +1,29 @@
+# 构建中间产物
+build/tmp/
+*.class
+*.dex
+build/*.jar
+*.apk.idsig
+*.unsigned
+
+# 系统 / 编辑器
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+*.iml
+
+# 逆向分析用的镜像与解包产物（体积太大，不入库）
+*.img
+*.bin
+payload.bin
+payload_properties.txt
+x9_img/
+*_out/
+
+*.keystore
+*.jks
+
+# 日志
+*.log
