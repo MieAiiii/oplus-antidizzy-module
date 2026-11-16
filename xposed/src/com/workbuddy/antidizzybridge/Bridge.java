@@ -1,6 +1,11 @@
 package com.workbuddy.antidizzybridge;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -78,6 +83,37 @@ public class Bridge implements IXposedHookLoadPackage {
     private static volatile boolean sAlphaApplied = false;
 
     private final VehicleDetector detector = new VehicleDetector();
+
+    // ---- 场景服务数据源（仅车辆运动模式的强信号） ----
+    // com.coloros.sceneservice 把导航状态实时写入它的 data_center.db：
+    //   navigation(source, type, status, lastUpdateTime)
+    // type='driving' 且 status=1 视为「正在驾车导航」。system_server 有权限读
+    // app_data_file，注入端可以直接查，比纯加速度计判断准（开导航 = 必在车上）。
+    private static final String SCENE_DB =
+            "/data/data/com.coloros.sceneservice/databases/data_center.db";
+    private volatile boolean sceneDriving = false;
+    private volatile boolean sceneDbOk = false;
+    private volatile String sceneDbErr = "";
+    private volatile int sceneStatus = -1;
+    private volatile int sceneNavStatus = 1;   // 场景库中 status 为该值视为导航中
+
+    // ---- 导航广播监听 ----
+    // 场景服务识别「驾车」靠的是地图导航 App 发出的状态广播。
+    // system_server 里注册 receiver 可以直接收到同样的广播——这是当前唯一
+    // 能拿到的可靠驾车信号（sensorhub 模块缺失、场景库被 SELinux 拦）。
+    // 先全量 dump extras 摸清格式，之后再解析 status。
+    private static final String[] NAV_ACTIONS = {
+            "com.autonavi.minimap#Navigation.NotifyDrivingNavigationStatus",   // 高德
+            "com.tencent.map#Navigation.NotifyDrivingNavigationStatus",        // 腾讯
+            "com.baidu.BaiduMap#Navigation.NotifyDrivingNavigationStatus",     // 百度
+            "com.baidu.navi#Navigation.NotifyDrivingNavigationStatus",         // 百度导航
+            "com.autonavi.minimap#Navigation.NotifyCruiseTrafficLightStatus",  // 高德巡航
+            "oplus.intent.action.POLICY_SCENE",
+    };
+    private volatile BroadcastReceiver navReceiver;
+    private volatile int navRxCount = 0;
+    /** 从导航广播解析出的「驾车中」状态（真实格式待实测校准） */
+    private volatile boolean navDriving = false;
     private final float[] gravity = new float[3];
     private boolean gravityInit;
     private long lastSampleNs = 0L;
@@ -155,6 +191,7 @@ public class Bridge implements IXposedHookLoadPackage {
         startRefresher();
         startReporter();
         registerSensors();
+        registerNavReceiver();
 
         log("ready: source=" + (sUseLinear ? "LINEAR_ACCELERATION" : "ACCELEROMETER")
                 + " gyro=" + (sGyro != null));
@@ -393,6 +430,7 @@ public class Bridge implements IXposedHookLoadPackage {
                     try {
                         refreshInstances();
                         refreshSettings();
+                        pollSceneDriving();
                         Thread.sleep(2000);
                     } catch (Throwable ignored) {
                         try { Thread.sleep(2000); } catch (Throwable ignored2) {}
@@ -416,6 +454,8 @@ public class Bridge implements IXposedHookLoadPackage {
                                 + " inst=" + (sInstances == null ? -1 : sInstances.size())
                                 + " a=(" + r(lastAx) + "," + r(lastAy) + "," + r(lastAz) + ")"
                                 + " gyro=" + r(lastGyro)
+                                + " scene=" + sceneDriving + "/" + sceneDbOk + "/st" + sceneStatus
+                                + " nav=" + navDriving + "/rx" + navRxCount
                                 + " alpha=" + sAppliedAlpha);
                     } catch (Throwable ignored) {
                     }
@@ -461,10 +501,108 @@ public class Bridge implements IXposedHookLoadPackage {
             detector.exitRms = vehStop;
             detector.enterHoldSec = vehHold;
             detector.enterLowRatio = readFloat(c, "motion_cues_veh_low", 0.55f);
+            sceneNavStatus = (int) readFloat(c, "motion_cues_scene_status", 1f);
             detector.enterRot = readFloat(c, "motion_cues_veh_rot", 0.12f);
             detector.stepReject = readFloat(c, "motion_cues_veh_step", 0.45f);
         } catch (Throwable ignored) {
         }
+    }
+
+    /** 轮询场景服务的导航状态。仅在「仅车辆运动」模式下读库。 */
+    private void pollSceneDriving() {
+        if (mode != 1) {
+            sceneDriving = false;
+            return;
+        }
+        SQLiteDatabase db = null;
+        Cursor c = null;
+        try {
+            db = SQLiteDatabase.openDatabase(SCENE_DB, null, SQLiteDatabase.OPEN_READONLY);
+            sceneDbOk = true;
+            sceneDbErr = "";
+            int st = -1;
+            c = db.rawQuery("SELECT status FROM navigation WHERE type='driving'", null);
+            if (c != null) {
+                while (c.moveToNext()) {
+                    int v = c.getInt(0);
+                    if (st < 0 || v < st) st = v;   // 取最小 status：进行中优先
+                }
+            }
+            sceneStatus = st;
+            boolean now = (st >= 0 && st == sceneNavStatus);
+            if (now != sceneDriving) {
+                log("scene driving -> " + now + " (status=" + st + ")");
+            }
+            sceneDriving = now;
+        } catch (Throwable t) {
+            // 只在错误变化时打日志，避免刷屏
+            if (!sceneDbErr.equals(t.toString())) {
+                sceneDbErr = t.toString();
+                log("scene db probe failed: " + t);
+            }
+            sceneDbOk = false;
+            sceneDriving = false;
+        } finally {
+            try { if (c != null) c.close(); } catch (Throwable ignored) {}
+            try { if (db != null) db.close(); } catch (Throwable ignored) {}
+        }
+    }
+
+    /** 注册导航广播监听：广播本身是公开的，system_server 也能收。 */
+    private void registerNavReceiver() {
+        try {
+            IntentFilter f = new IntentFilter();
+            for (String a : NAV_ACTIONS) f.addAction(a);
+            // 千万不要 addDataType：带 type 的 filter 只匹配有 MIME 的 intent，
+            // 导航广播没有 type，加了就永远收不到（本次排查花了一轮部署才定位）
+            navReceiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    try {
+                        navRxCount++;
+                        StringBuilder sb = new StringBuilder(intent.getAction());
+                        String pkg = intent.getPackage();
+                        if (pkg != null) sb.append(" pkg=").append(pkg);
+                        android.os.Bundle ex = intent.getExtras();
+                        if (ex != null) {
+                            sb.append(" extras={");
+                            for (String k : ex.keySet()) {
+                                sb.append(k).append('=').append(ex.get(k)).append(", ");
+                            }
+                            sb.append('}');
+                        }
+                        log("nav rx: " + sb);
+                        boolean d = guessDriving(intent);
+                        if (d != navDriving) {
+                            navDriving = d;
+                            log("nav driving -> " + d);
+                        }
+                    } catch (Throwable ignored) {}
+                }
+            };
+            sCtx.registerReceiver(navReceiver, f);
+            log("nav receiver registered (" + NAV_ACTIONS.length + " actions)");
+        } catch (Throwable t) {
+            log("nav receiver failed: " + t);
+        }
+    }
+
+    /**
+     * 启发式解析导航广播里的「驾车中」状态。
+     * 真实格式以日志 dump 为准，这里先覆盖常见的 key 约定。
+     */
+    private boolean guessDriving(Intent intent) {
+        android.os.Bundle ex = intent.getExtras();
+        if (ex == null) return navDriving;
+        for (String k : new String[]{"status", "navigation_status", "NavigationStatus"}) {
+            Object v = ex.get(k);
+            if (v instanceof Integer) return (Integer) v == 1;
+        }
+        for (String k : new String[]{"isNavigation", "isNavigating", "isDriving"}) {
+            Object v = ex.get(k);
+            if (v instanceof Boolean) return (Boolean) v;
+        }
+        return navDriving;
     }
 
     private static float readFloat(Context c, String key, float def) {
