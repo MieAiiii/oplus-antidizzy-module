@@ -103,6 +103,13 @@
     <button onclick="saveVeh()">保存车辆参数</button>
   </details>
 
+  <div class="card">
+    <div class="row" style="padding-bottom:6px">
+      <div class="label">一键恢复默认参数<div class="hint">灵敏度 1.0×、车辆阈值回默认、关闭测试模式；不影响显示模式与功能开关</div></div>
+    </div>
+    <button class="ghost" onclick="resetDefaults()">恢复默认参数</button>
+  </div>
+
   <details class="card">
     <summary>测试（模拟车辆振动）</summary>
     <div class="seg">
@@ -204,6 +211,26 @@ async function setMode(m) {
   await putSetting('oplus_customize_antidizzy_mode', m);
   toast(m === 2 ? '已切换：常驻显示' : '已切换：仅车辆运动');
   refreshState();
+}
+
+// ---------- 恢复默认 ----------
+const DEFAULTS = {
+  motion_cues_gain: 1.0,
+  motion_cues_veh_rms: 0.12,
+  motion_cues_veh_low: 0.55,
+  motion_cues_veh_rot: 0.12,
+  motion_cues_veh_step: 0.45,
+  motion_cues_veh_hold: 8,
+  motion_cues_bridge_test: 0,
+};
+async function resetDefaults() {
+  if (!confirm('将灵敏度与车辆识别阈值全部恢复为默认值？\n（不影响显示模式与功能开关）')) return;
+  try {
+    for (const k in DEFAULTS) await putSetting(k, DEFAULTS[k]);
+    await Promise.all([loadGain(), loadVeh()]);
+    await refreshState();
+    toast('已恢复默认参数');
+  } catch (e) { toast('恢复失败：' + e.message); }
 }
 
 // ---------- 测试 ----------

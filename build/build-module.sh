@@ -12,7 +12,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MOD="$ROOT/module"
 DIST="$ROOT/dist"
-APK="$DIST/AntiDizzyBridge.apk"
+APK="$MOD/files/AntiDizzyBridge.apk"
 
 if [ ! -f "$APK" ]; then
   echo "错误：找不到 $APK，请先运行 ./build/build-apk.sh" >&2
@@ -29,8 +29,7 @@ if [ -z "$PY" ]; then
 fi
 
 mkdir -p "$DIST"
-# 用最新构建的 APK 覆盖模块里的旧副本
-cp -f "$APK" "$MOD/files/AntiDizzyBridge.apk"
+cp -f "$APK" "$DIST/AntiDizzyBridge.apk"
 
 "$PY" - "$MOD" "$OUT" <<'PY'
 import sys, os, zipfile, stat
