@@ -24,14 +24,31 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # 不用第三方 action，直接拉官方 commandline-tools，版本可控、依赖少
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install build-tools and platform
         run: |
-          sdkmanager --install "build-tools;35.0.0" "platforms;android-36" > /dev/null
-          echo "ANDROID_JAR=$ANDROID_HOME/platforms/android-36/android.jar" >> "$GITHUB_ENV"
-          echo "BUILD_TOOLS=$ANDROID_HOME/build-tools/35.0.0" >> "$GITHUB_ENV"
+          set -euo pipefail
+          SDK_ROOT="$RUNNER_TEMP/android-sdk"
+          mkdir -p "$SDK_ROOT/cmdline-tools"
+          curl -sSLo /tmp/cmdline-tools.zip \
+            https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip -q /tmp/cmdline-tools.zip -d "$SDK_ROOT/cmdline-tools"
+          mv "$SDK_ROOT/cmdline-tools/cmdline-tools" "$SDK_ROOT/cmdline-tools/latest"
+
+          export ANDROID_HOME="$SDK_ROOT"
+          export PATH="$SDK_ROOT/cmdline-tools/latest/bin:$PATH"
+
+          ( yes || true ) | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager --install "build-tools;35.0.0" "platforms;android-36"
+
+          test -f "$SDK_ROOT/platforms/android-36/android.jar"
+          test -x "$SDK_ROOT/build-tools/35.0.0/aapt2"
+
+          {
+            echo "ANDROID_HOME=$SDK_ROOT"
+            echo "ANDROID_JAR=$SDK_ROOT/platforms/android-36/android.jar"
+            echo "BUILD_TOOLS=$SDK_ROOT/build-tools/35.0.0"
+          } >> "$GITHUB_ENV"
 
       # 固定签名，否则升级安装会因签名不一致失败。
       # 未配置 Secret 时脚本会生成临时签名，仅够验证编译通过。
