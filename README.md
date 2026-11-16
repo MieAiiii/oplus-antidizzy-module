@@ -1,5 +1,7 @@
 # 晕动舒缓显示 · 欧加通用模块
 
+[![Build & Release](https://github.com/yibgt/oplus-antidizzy-module/actions/workflows/build.yml/badge.svg)](https://github.com/yibgt/oplus-antidizzy-module/actions/workflows/build.yml)
+
 给**缺少「晕动舒缓显示」的 OPPO / 一加 / realme（欧加）ColorOS 机型**补全原生功能。
 
 基于 KernelSU + LSPosed。圆点由**原厂 `AntiDizzyView` 绘制**，模块只做三件事：解开被隐藏的特性开关、用手机自带传感器替代缺失的车辆传感器、给原厂圆点补上边缘抗锯齿。
@@ -106,6 +108,7 @@ tools/dalvik.py    DEX 反汇编工具（逆向时用）
 ## 文档
 
 - [技术文档](docs/technical-notes.md)：完整的逆向结论、算法原理、调试命令、调参表
+- [维护与发布](docs/RELEASING.md)：日常改动、发版流程、CI 与签名密钥说明
 - [论坛文案（精简）](docs/promo-short.md) / [（详细）](docs/promo-detailed.md)
 
 ## 免责声明

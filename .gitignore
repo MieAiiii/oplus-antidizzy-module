@@ -24,6 +24,7 @@ x9_img/
 
 *.keystore
 *.jks
+*.b64
 
 # 日志
 *.log
