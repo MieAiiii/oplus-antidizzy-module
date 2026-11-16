@@ -116,23 +116,23 @@
   /* ===== SmallTitle：subtitle(14sp Bold) + onBackgroundVariant + PaddingValues(28, 8) ===== */
   .group-title {
     font-size: 14px; font-weight: 700; color: var(--on-bg-variant);
-    padding: 0 28px; margin: 14px 0 6px;
+    padding: 0 28px; margin: 8px 0 4px;
     letter-spacing: .1px;
   }
 
-  /* ===== Card：16dp squircle 平滑圆角（miuix-squircle），surfaceContainer，无阴影 ===== */
+  /* ===== Card：20dp squircle 平滑圆角（miuix-squircle），surfaceContainer，无阴影 ===== */
   .card {
     background: var(--card);
-    border-radius: 16px;
+    border-radius: 20px;
     corner-shape: squircle;         /* Chrome 133+：超椭圆平滑圆角（miuix squircle） */
     overflow: hidden;
     margin-bottom: 12px;            /* miuix 卡片间距 12dp */
   }
   .card:last-child { margin-bottom: 0; }
 
-  /* ===== BasicComponent：minHeight 64dp（宽松版），InsideMargin 16dp，标题 17sp Medium ===== */
+  /* ===== BasicComponent：minHeight 56dp（紧凑版），InsideMargin 16dp，标题 17sp Medium ===== */
   .mi-row {
-    position: relative; min-height: 64px; padding: 16px;
+    position: relative; min-height: 56px; padding: 12px 16px;
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
   }
   /* 行间分隔线：已按需求关闭（如需恢复把下面规则取消注释） */
@@ -145,7 +145,7 @@
   .mi-row.pressable:active { transform: scale(.985); background: var(--press); }
   .row-main { flex: 1; min-width: 0; }
   .row-title { font-size: 17px; font-weight: 500; }      /* headline1 + Medium */
-  .row-summary { font-size: 14px; color: var(--summary); margin-top: 4px; line-height: 1.45; }
+  .row-summary { font-size: 14px; color: var(--summary); margin-top: 2px; line-height: 1.4; }
   .row-value { font-size: 17px; color: var(--summary); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .row-label { display: flex; align-items: center; font-size: 17px; font-weight: 500; }
 
@@ -191,7 +191,7 @@
             左右留白 = 14dp（thumbRadius），
             拖拽时轨道叠加 4.4% 黑蒙版，thumb 放大 1.127 ===== */
   .slider {
-    position: relative; height: 28px; margin: 12px 16px 10px;
+    position: relative; height: 28px; margin: 10px 16px 6px;
     touch-action: none; cursor: pointer; isolation: isolate;
   }
   .slider-track {
