@@ -65,10 +65,10 @@ jobs:
           fi
 
       - name: Build APK
-        run: ./build/build-apk.sh
+        run: bash ./build/build-apk.sh
 
       - name: Build module zip
-        run: ./build/build-module.sh
+        run: bash ./build/build-module.sh
 
       - name: Show artifacts
         run: ls -la dist/
