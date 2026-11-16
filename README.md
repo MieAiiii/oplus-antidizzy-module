@@ -89,6 +89,26 @@ docs/              技术文档、论坛文案、截图
 tools/dalvik.py    DEX 反汇编工具（逆向时用）
 ```
 
+## 更新日志
+
+### v7.0（相对 v5.x 的完整变化）
+
+**KernelSU WebUI 控制面板（v6.0 新增）**
+- 免 PC 调参：KernelSU 管理器内直接调节灵敏度、显示模式、车辆识别阈值、测试模式，改动约 2 秒生效
+- 新增「晕动舒缓显示」总开关、一键恢复默认参数
+
+**HyperOS 风格 UI（v6.1 ~ v6.4）**
+- WebUI 按官方开源 miuix 项目（compose-miuix-ui/miuix）源码 1:1 复刻：颜色、字体、圆角、组件尺寸全部取自源码 token
+- 复刻折叠大标题顶栏（毛玻璃）、49×28 开关、28dp 胶囊滑杆（圆头包裹滑块）、单选行、miuix 弹窗
+- 浅色/深色双主题跟随系统
+
+**纵向独立增益（v6.5，算法）**
+- 逆向原厂 `AntiDizzyMotionAlgorithm` 确认 X/Y 处理完全对称（死区 0.196 m/s²、低通 0.05、速度 =|a|×12 封顶 40）
+- 前后向迟钝的根源是物理信号差：转弯侧向 1~3 m/s²，加减速仅 0.3~0.8 m/s²，被死区+低通二次衰减
+- 新增 `motion_cues_gain_y`（默认 2.5×）独立放大纵向信号，转弯路径不动；车辆识别仍吃原始数据
+
+**v7.0**：整合以上全部改进的稳定里程碑，无破坏性变更。
+
 ## 兼容性
 
 | 系统 | 状态 |
@@ -109,7 +129,7 @@ tools/dalvik.py    DEX 反汇编工具（逆向时用）
 
 - [技术文档](docs/technical-notes.md)：完整的逆向结论、算法原理、调试命令、调参表
 - [维护与发布](docs/RELEASING.md)：日常改动、发版流程、CI 与签名密钥说明
-- [论坛文案（精简）](docs/promo-short.md) / [（详细）](docs/promo-detailed.md)
+- [论坛文案（精简）](docs/promo-short.md) / [（详细）](docs/promo-detailed.md) / [（v7.0 发布版）](docs/promo-v7.md)
 
 ## 免责声明
 
