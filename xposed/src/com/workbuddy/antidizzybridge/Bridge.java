@@ -4,8 +4,6 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -84,31 +82,20 @@ public class Bridge implements IXposedHookLoadPackage {
 
     private final VehicleDetector detector = new VehicleDetector();
 
-    // ---- 场景服务数据源（仅车辆运动模式的强信号） ----
-    // com.coloros.sceneservice 把导航状态实时写入它的 data_center.db：
-    //   navigation(source, type, status, lastUpdateTime)
-    // type='driving' 且 status=1 视为「正在驾车导航」。system_server 有权限读
-    // app_data_file，注入端可以直接查，比纯加速度计判断准（开导航 = 必在车上）。
-    private static final String SCENE_DB =
-            "/data/data/com.coloros.sceneservice/databases/data_center.db";
-    private volatile boolean sceneDriving = false;
-    private volatile boolean sceneDbOk = false;
-    private volatile String sceneDbErr = "";
-    private volatile int sceneStatus = -1;
-    private volatile int sceneNavStatus = 1;   // 场景库中 status 为该值视为导航中
-
     // ---- 导航广播监听 ----
     // 场景服务识别「驾车」靠的是地图导航 App 发出的状态广播。
     // system_server 里注册 receiver 可以直接收到同样的广播——这是当前唯一
     // 能拿到的可靠驾车信号（sensorhub 模块缺失、场景库被 SELinux 拦）。
     // 先全量 dump extras 摸清格式，之后再解析 status。
     private static final String[] NAV_ACTIONS = {
-            "com.autonavi.minimap#Navigation.NotifyDrivingNavigationStatus",   // 高德
-            "com.tencent.map#Navigation.NotifyDrivingNavigationStatus",        // 腾讯
-            "com.baidu.BaiduMap#Navigation.NotifyDrivingNavigationStatus",     // 百度
-            "com.baidu.navi#Navigation.NotifyDrivingNavigationStatus",         // 百度导航
-            "com.autonavi.minimap#Navigation.NotifyCruiseTrafficLightStatus",  // 高德巡航
-            "oplus.intent.action.POLICY_SCENE",
+            "com.autonavi.minimap#Navigation.NotifyDrivingNavigationStatus",      // 高德驾车
+            "com.autonavi.minimap#Navigation.NotifyPublicTransportStatus",        // 高德公交/地铁
+            "com.autonavi.minimap#Navigation.NotifyGaoDeTaxiStatus",              // 高德打车
+            "com.autonavi.minimap#Navigation.NotifyCruiseTrafficLightStatus",     // 高德巡航
+            "com.tencent.map#Navigation.NotifyDrivingNavigationStatus",           // 腾讯驾车
+            "com.tencent.map#Navigation.NotifyCruiseTrafficLightStatus",          // 腾讯巡航
+            "com.baidu.BaiduMap#Navigation.NotifyDrivingNavigationStatus",        // 百度
+            "com.baidu.navi#Navigation.NotifyDrivingNavigationStatus",            // 百度导航
     };
     private volatile BroadcastReceiver navReceiver;
     private volatile int navRxCount = 0;
@@ -430,7 +417,6 @@ public class Bridge implements IXposedHookLoadPackage {
                     try {
                         refreshInstances();
                         refreshSettings();
-                        pollSceneDriving();
                         Thread.sleep(2000);
                     } catch (Throwable ignored) {
                         try { Thread.sleep(2000); } catch (Throwable ignored2) {}
@@ -454,7 +440,6 @@ public class Bridge implements IXposedHookLoadPackage {
                                 + " inst=" + (sInstances == null ? -1 : sInstances.size())
                                 + " a=(" + r(lastAx) + "," + r(lastAy) + "," + r(lastAz) + ")"
                                 + " gyro=" + r(lastGyro)
-                                + " scene=" + sceneDriving + "/" + sceneDbOk + "/st" + sceneStatus
                                 + " nav=" + navDriving + "/rx" + navRxCount
                                 + " alpha=" + sAppliedAlpha);
                     } catch (Throwable ignored) {
@@ -501,50 +486,9 @@ public class Bridge implements IXposedHookLoadPackage {
             detector.exitRms = vehStop;
             detector.enterHoldSec = vehHold;
             detector.enterLowRatio = readFloat(c, "motion_cues_veh_low", 0.55f);
-            sceneNavStatus = (int) readFloat(c, "motion_cues_scene_status", 1f);
             detector.enterRot = readFloat(c, "motion_cues_veh_rot", 0.12f);
             detector.stepReject = readFloat(c, "motion_cues_veh_step", 0.45f);
         } catch (Throwable ignored) {
-        }
-    }
-
-    /** 轮询场景服务的导航状态。仅在「仅车辆运动」模式下读库。 */
-    private void pollSceneDriving() {
-        if (mode != 1) {
-            sceneDriving = false;
-            return;
-        }
-        SQLiteDatabase db = null;
-        Cursor c = null;
-        try {
-            db = SQLiteDatabase.openDatabase(SCENE_DB, null, SQLiteDatabase.OPEN_READONLY);
-            sceneDbOk = true;
-            sceneDbErr = "";
-            int st = -1;
-            c = db.rawQuery("SELECT status FROM navigation WHERE type='driving'", null);
-            if (c != null) {
-                while (c.moveToNext()) {
-                    int v = c.getInt(0);
-                    if (st < 0 || v < st) st = v;   // 取最小 status：进行中优先
-                }
-            }
-            sceneStatus = st;
-            boolean now = (st >= 0 && st == sceneNavStatus);
-            if (now != sceneDriving) {
-                log("scene driving -> " + now + " (status=" + st + ")");
-            }
-            sceneDriving = now;
-        } catch (Throwable t) {
-            // 只在错误变化时打日志，避免刷屏
-            if (!sceneDbErr.equals(t.toString())) {
-                sceneDbErr = t.toString();
-                log("scene db probe failed: " + t);
-            }
-            sceneDbOk = false;
-            sceneDriving = false;
-        } finally {
-            try { if (c != null) c.close(); } catch (Throwable ignored) {}
-            try { if (db != null) db.close(); } catch (Throwable ignored) {}
         }
     }
 
