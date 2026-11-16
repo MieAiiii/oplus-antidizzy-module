@@ -105,8 +105,8 @@ tools/dalvik.py    DEX 反汇编工具（逆向时用）
 
 ## 文档
 
-- [技术文档](docs/技术文档.md)：完整的逆向结论、算法原理、调试命令、调参表
-- [论坛文案（精简）](docs/论坛文案_精简版.md) / [（详细）](docs/论坛文案_详细版.md)
+- [技术文档](docs/technical-notes.md)：完整的逆向结论、算法原理、调试命令、调参表
+- [论坛文案（精简）](docs/promo-short.md) / [（详细）](docs/promo-detailed.md)
 
 ## 免责声明
 
