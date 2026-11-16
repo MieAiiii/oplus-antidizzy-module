@@ -6,6 +6,8 @@
 
 基于 KernelSU + LSPosed。圆点由**原厂 `AntiDizzyView` 绘制**，模块只做三件事：解开被隐藏的特性开关、用手机自带传感器替代缺失的车辆传感器、给原厂圆点补上边缘抗锯齿。
 
+> **⬇️ 下载**：[GitHub Releases 最新版](https://github.com/yibgt/oplus-antidizzy-module/releases/latest) —— 下载 `oplus-antidizzy-module-vX.Y.zip` 刷入 KernelSU 即可，无需自行构建。
+
 ## 为什么需要它
 
 ColorOS 16 的「晕动舒缓显示」（设置 → 辅助功能）会在屏幕两侧绘制一列随车辆运动反向滑动的圆点，缓解坐车看屏幕的晕动感。但这功能被机型白名单锁死，名单外的机器设置里开关是灰的。
@@ -28,8 +30,10 @@ ColorOS 16 的「晕动舒缓显示」（设置 → 辅助功能）会在屏幕�
 
 **算法**
 
-- 圆点抗锯齿用 `fwidth` 按像素计算过渡宽度，**任何分辨率 / DPI / 球尺寸都是 1px 过渡，零配置**
 - 车辆识别用五维特征（振动能量、1–6Hz 低频占比、重力方向占比、陀螺 RMS、步频自相关），陀螺是**否决**条件而非触发条件，另加 8 秒手持抑制
+- **纵向独立增益**：原厂算法对 X/Y 完全对称，但车辆加减速的物理信号天然比转弯侧向弱好几倍——纵向独立放大（默认 2.5×），前后摆动观感与转弯一致
+- **静止噪声门限**：抑制竖持手机时重力补偿泄漏与手持缓晃导致的圆点漂移，车内大信号无损通过
+- 圆点抗锯齿用 `fwidth` 按像素计算过渡宽度，**任何分辨率 / DPI / 球尺寸都是 1px 过渡，零配置**
 
 抗锯齿前后对比（放大 10 倍）：
 
@@ -37,9 +41,13 @@ ColorOS 16 的「晕动舒缓显示」（设置 → 辅助功能）会在屏幕�
 
 ## 安装
 
-1. 从 [Releases](https://github.com/yibgt/oplus-antidizzy-module/releases) 下载最新的 zip，在 KernelSU 中安装 → 重启
+1. 从 [**Releases 最新版**](https://github.com/yibgt/oplus-antidizzy-module/releases/latest) 下载 `oplus-antidizzy-module-vX.Y.zip`，在 KernelSU 中安装 → 重启
 2. 打开 **LSPosed** → 模块 → 勾选 **AntiDizzy Bridge** → 作用域只勾 **系统框架** → 重启
 3. 设置 → 辅助功能 → 晕动舒缓显示 → 开启
+
+> - 第 2 步必须手工做：LSPosed 的配置是 SQLite 库，KernelSU 写不了，这是整个流程里唯一需要动手的地方
+> - 更新模块后需**整机重启**（`pm install` 会改变 APK 路径，而 LSPosed 在 zygote 里缓存旧路径）
+> - 模块更新时不会触发 `uninstall.sh`，可以放心覆盖安装
 
 ## 使用
 
@@ -51,11 +59,6 @@ ColorOS 16 的「晕动舒缓显示」（设置 → 辅助功能）会在屏幕�
 
 > 上图即系统原生「晕动舒缓显示」设置页：总开关控制功能启停，「常驻显示 / 仅车辆运动时显示」切换模式。WebUI 负责一次性的参数调校，日常开关交给系统原生界面。
 
-> 第 2 步必须手工做。LSPosed 的配置是 SQLite 库，KernelSU 写不了，这是整个流程里唯一需要动手的地方。
->
-> 更新模块后需**整机重启**（`pm install` 会改变 APK 路径，而 LSPosed 在 zygote 里缓存旧路径）。
-> 模块更新时不会触发 `uninstall.sh`，可以放心覆盖安装。
-
 ## 卸载
 
 在 KernelSU 里删除模块即可，模块会自己收拾干净：
@@ -64,38 +67,6 @@ ColorOS 16 的「晕动舒缓显示」（设置 → 辅助功能）会在屏幕�
 - 另有一个「墓碑」脚本放在 `/data/adb/service.d/`，万一 `uninstall.sh` 没跑成，下次开机会补做并自删
 
 分区文件全程未被修改（只读 EROFS + bind mount 覆盖），`umount` 后即为原样。
-
-## 构建
-
-需要 JDK 17+、Android build-tools、`android.jar`（API 33+）：
-
-```bash
-export ANDROID_JAR=$ANDROID_HOME/platforms/android-36/android.jar
-export BUILD_TOOLS=$ANDROID_HOME/build-tools/35.0.0
-
-./build/build-apk.sh      # 编译 LSPosed 模块 → dist/AntiDizzyBridge.apk
-./build/build-module.sh   # 打包成可刷入的模块 zip → dist/*.zip
-```
-
-> `aapt2` 不支持非 ASCII 路径，项目必须放在纯英文目录下。构建脚本会提前检查并提示。
-
-## 项目结构
-
-```
-module/            KernelSU 模块（module.prop + 四个脚本）
-  post-fs-data.sh    探测并 patch 特性配置，bind mount
-  service.sh         安装桥接 APK、部署卸载墓碑
-  cleanup.sh         清理逻辑（uninstall.sh 与墓碑共用）
-  uninstall.sh       模块被删除时执行
-xposed/            LSPosed 模块源码
-  src/               Bridge.java（注入与调度）、VehicleDetector.java（车辆识别）
-  stub/              Xposed API 编译期桩（不进 dex，运行时由 LSPosed 提供）
-  assets/xposed_init 入口声明
-build/             构建脚本
-dist/             本地构建输出（不入库，从 Releases 下载）
-docs/              技术文档、论坛文案、截图
-tools/dalvik.py    DEX 反汇编工具（逆向时用）
-```
 
 ## 更新日志
 
@@ -140,11 +111,43 @@ tools/dalvik.py    DEX 反汇编工具（逆向时用）
 - 抗锯齿依赖 `GL_OES_standard_derivatives`（GLES2 可选项，实际支持率接近 100%）；不支持时退化为固定宽度平滑。
 - LSPosed 作用域需手动勾选。
 
+## 构建
+
+需要 JDK 17+、Android build-tools、`android.jar`（API 33+）：
+
+```bash
+export ANDROID_JAR=$ANDROID_HOME/platforms/android-36/android.jar
+export BUILD_TOOLS=$ANDROID_HOME/build-tools/35.0.0
+
+./build/build-apk.sh      # 编译 LSPosed 模块 → dist/AntiDizzyBridge.apk
+./build/build-module.sh   # 打包成可刷入的模块 zip → dist/*.zip
+```
+
+> `aapt2` 不支持非 ASCII 路径，项目必须放在纯英文目录下。构建脚本会提前检查并提示。
+
+## 项目结构
+
+```
+module/            KernelSU 模块（module.prop + 四个脚本）
+  post-fs-data.sh    探测并 patch 特性配置，bind mount
+  service.sh         安装桥接 APK、部署卸载墓碑
+  cleanup.sh         清理逻辑（uninstall.sh 与墓碑共用）
+  uninstall.sh       模块被删除时执行
+xposed/            LSPosed 模块源码
+  src/               Bridge.java（注入与调度）、VehicleDetector.java（车辆识别）
+  stub/              Xposed API 编译期桩（不进 dex，运行时由 LSPosed 提供）
+  assets/xposed_init 入口声明
+build/             构建脚本
+dist/              本地构建输出（不入库，从 Releases 下载）
+docs/              技术文档、论坛文案、截图
+tools/dalvik.py    DEX 反汇编工具（逆向时用）
+```
+
 ## 文档
 
 - [技术文档](docs/technical-notes.md)：完整的逆向结论、算法原理、调试命令、调参表
 - [维护与发布](docs/RELEASING.md)：日常改动、发版流程、CI 与签名密钥说明
-- [论坛文案（精简）](docs/promo-short.md) / [（详细）](docs/promo-detailed.md) / [（v7.0 发布版）](docs/promo-v7.md)
+- [论坛文案（精简）](docs/promo-short.md) / [（详细）](docs/promo-detailed.md) / [（v7.1 发布版）](docs/promo-v7.md)
 
 ## 免责声明
 
