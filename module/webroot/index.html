@@ -3,160 +3,404 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>晕动舒缓 · 控制面板</title>
+<title>晕动舒缓显示</title>
 <style>
+  /* ===== miuix / HyperOS 设计 Token（自 compose-miuix-ui/miuix 源码提取）=====
+     颜色：theme/Colors.kt · 字体：theme/TextStyles.kt
+     卡片 16dp 圆角 · 行 56dp/16dp 内距 · 开关 49x28/20dp
+     滑杆轨道 28dp · 白色滑块 20dp · 按钮 16dp 圆角/40dp 高/17sp */
   :root {
     color-scheme: light dark;
-    --bg: #f3f3f5;
-    --card: #ffffff;
-    --text: #16171a;
-    --sub: #86868b;
-    --accent: #0d84ff;
-    --accent-soft: rgba(13,132,255,.10);
-    --line: rgba(0,0,0,.055);
-    --seg-bg: rgba(0,0,0,.05);
+    --primary: #3482FF;
+    --on-primary: #FFFFFF;
+    --surface: #F7F7F7;            /* 页面背景 */
+    --card: #FFFFFF;               /* surfaceContainer */
+    --text: #000000;               /* onBackground */
+    --title-sub: #8C93B0;          /* onBackgroundVariant 组标题 */
+    --summary: rgba(0,0,0,.60);    /* onSurfaceVariantSummary */
+    --text-2: #959595;             /* onSurfaceContainerVariant */
+    --accent-soft: #EAF2FF;        /* tertiaryContainer */
+    --accent-soft-on: #3482FF;
+    --btn-bg: #F0F0F0;             /* secondaryVariant */
+    --btn-text: #303030;
+    --input-bg: #F0F0F0;           /* secondaryContainer */
+    --switch-off: #E6E6E6;         /* secondary */
+    --divider: #E0E0E0;
+    --slider-bg: rgba(0,0,0,.06);
+    --press: rgba(0,0,0,.05);
+    --dim: rgba(0,0,0,.3);
+    --toast-bg: rgba(28,28,30,.92);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #0b0b0d;
-      --card: #1c1c1f;
-      --text: #f2f2f5;
-      --sub: #93939a;
-      --accent: #0a84ff;
-      --accent-soft: rgba(10,132,255,.16);
-      --line: rgba(255,255,255,.06);
-      --seg-bg: rgba(255,255,255,.06);
+      --primary: #277AF7;
+      --surface: #000000;
+      --card: #242424;
+      --text: rgba(255,255,255,.90);
+      --title-sub: #787E96;
+      --summary: rgba(255,255,255,.50);
+      --text-2: #737373;
+      --accent-soft: #2B3B54;
+      --accent-soft-on: #4788FF;
+      --btn-bg: #434343;
+      --btn-text: #D9D9D9;
+      --input-bg: #434343;
+      --switch-off: #505050;
+      --divider: #393939;
+      --slider-bg: rgba(255,255,255,.15);
+      --press: rgba(255,255,255,.06);
+      --dim: rgba(0,0,0,.6);
+      --toast-bg: rgba(70,70,72,.95);
     }
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { background: var(--surface); }
   body {
-    margin: 0 auto; max-width: 560px; padding: 0 14px 44px;
-    background: var(--bg); color: var(--text);
-    font: 15px/1.5 MiSans, "MiSans VF", -apple-system, "HarmonyOS Sans SC",
-          "Noto Sans CJK SC", "Segoe UI", sans-serif;
+    margin: 0 auto; max-width: 560px; padding: 0 16px calc(40px + env(safe-area-inset-bottom));
+    background: var(--surface); color: var(--text);
+    font-family: MiSans, "MiSans VF", "HarmonyOS Sans SC", "OPPO Sans", "PingFang SC",
+                 "Noto Sans CJK SC", system-ui, sans-serif;
+    font-size: 17px; line-height: 1.45;
   }
-  .page-title {
-    font-size: 30px; font-weight: 700; letter-spacing: .3px;
-    margin: 26px 6px 20px;
+
+  /* ===== 顶栏（miuix TopAppBar：大标题 32sp，折叠为居中 20sp Medium） ===== */
+  .appbar {
+    position: sticky; top: 0; z-index: 8; margin: 0 -16px;
+    padding: env(safe-area-inset-top) 26px 0;
+    background: transparent;
+    transition: background .22s ease;
   }
+  .appbar-inner { position: relative; }
+  .appbar-large {
+    margin: 0; font-size: 32px; font-weight: 500; letter-spacing: .2px;
+    padding: 14px 0 12px; max-height: 64px;
+    transition: opacity .16s ease, max-height .2s ease, padding .2s ease, transform .16s ease;
+  }
+  .appbar-small {
+    position: absolute; top: 0; left: 0; right: 0; height: 52px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 500;
+    opacity: 0; transform: translateY(10px);
+    transition: opacity .16s ease, transform .18s ease;
+    pointer-events: none;
+  }
+  .appbar.collapsed { background: color-mix(in srgb, var(--surface) 86%, transparent); }
+  @supports (backdrop-filter: blur(1px)) {
+    .appbar.collapsed {
+      background: color-mix(in srgb, var(--surface) 62%, transparent);
+      -webkit-backdrop-filter: blur(20px) saturate(1.6);
+      backdrop-filter: blur(20px) saturate(1.6);
+    }
+  }
+  .appbar.collapsed .appbar-large { opacity: 0; max-height: 0; padding: 0; transform: scale(.98); }
+  .appbar.collapsed .appbar-small { opacity: 1; transform: translateY(0); }
+
+  /* ===== 组标题（SmallTitle：14sp Bold，onBackgroundVariant，28dp/8dp） ===== */
   .group-title {
-    font-size: 13px; color: var(--sub); font-weight: 500;
-    margin: 20px 14px 8px;
+    font-size: 14px; font-weight: 700; color: var(--title-sub);
+    margin: 14px 0 8px; padding: 0 12px;
   }
+
+  /* ===== 卡片（Card：16dp squircle 圆角，surfaceContainer） ===== */
   .card {
-    background: var(--card); border-radius: 24px;
-    padding: 2px 18px; margin-bottom: 6px;
-    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+    background: var(--card); border-radius: 16px; overflow: hidden;
+    margin-bottom: 4px;
   }
-  .row { display: flex; align-items: center; justify-content: space-between; padding: 13px 0; }
-  .row + .row { border-top: 1px solid var(--line); }
-  .label { font-size: 15px; font-weight: 500; }
-  .hint { color: var(--sub); font-size: 12px; font-weight: 400; margin-top: 3px; line-height: 1.45; }
-  .value { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 15px; }
-  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; background: var(--sub); }
-  .dot.on { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
-  .dot.off { background: var(--sub); }
-  input[type=range] { width: 100%; height: 36px; accent-color: var(--accent); margin: 2px 0 4px; }
-  input[type=number], input[type=text] {
-    background: var(--seg-bg); color: var(--text); border: none;
-    border-radius: 12px; padding: 9px 12px; font-size: 14px; max-width: 140px;
+
+  /* ===== 行（BasicComponent：最小 56dp，16dp 内距，标题 17sp Medium，摘要 14sp） ===== */
+  .mi-row {
+    position: relative; min-height: 56px; padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .mi-row + .mi-row::before {
+    content: ''; position: absolute; top: 0; left: 16px; right: 0;
+    height: 1px; background: var(--divider);
+  }
+  .mi-row.pressable:active { background: var(--press); }
+  .row-main { flex: 1; min-width: 0; }
+  .row-title { font-size: 17px; font-weight: 500; }
+  .row-summary { font-size: 14px; color: var(--summary); margin-top: 2px; line-height: 1.4; }
+  .row-value { font-size: 17px; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .row-label { display: flex; align-items: center; font-size: 17px; font-weight: 500; }
+
+  /* 状态圆点 */
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 10px; background: var(--text-2); }
+  .dot.on { background: var(--primary); box-shadow: 0 0 7px color-mix(in srgb, var(--primary) 60%, transparent); }
+
+  /* ===== 开关（Switch：轨道 49x28 胶囊，滑块 20dp，开=primary 关=secondary） ===== */
+  .switch {
+    flex: none; position: relative; width: 49px; height: 28px; border-radius: 14px;
+    background: var(--switch-off); transition: background .22s cubic-bezier(.4,0,.2,1);
+    cursor: pointer;
+  }
+  .switch .knob {
+    position: absolute; top: 4px; left: 4px; width: 20px; height: 20px; border-radius: 50%;
+    background: #FFFFFF; box-shadow: 0 1px 3px rgba(0,0,0,.22);
+    transition: left .22s cubic-bezier(.34,1.25,.64,1), transform .18s cubic-bezier(.34,1.25,.64,1);
+  }
+  .switch:active .knob { transform: scale(1.127); }
+  .switch.on { background: var(--primary); }
+  .switch.on .knob { left: 25px; }
+  .switch.disabled { opacity: .4; pointer-events: none; }
+
+  /* ===== 单选（RadioButton：primary 圆点 + 外圈） ===== */
+  .radio {
+    flex: none; width: 22px; height: 22px; border-radius: 50%;
+    border: 2px solid var(--text-2); position: relative; transition: border-color .18s;
+  }
+  .radio::after {
+    content: ''; position: absolute; inset: 0; margin: auto; width: 11px; height: 11px;
+    border-radius: 50%; background: var(--primary); transform: scale(0); transition: transform .2s cubic-bezier(.34,1.4,.64,1);
+  }
+  .radio.sel { border-color: var(--primary); }
+  .radio.sel::after { transform: scale(1); }
+
+  /* ===== 滑杆（Slider：28dp 胶囊轨道，填充 primary，白色 20dp 滑块，按压 1.127 倍） ===== */
+  .slider { position: relative; height: 28px; margin: 10px 4px 2px; touch-action: none; cursor: pointer; }
+  .slider-track {
+    position: absolute; inset: 0; border-radius: 14px;
+    background: var(--slider-bg); overflow: hidden;
+  }
+  .slider-fill {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 0;
+    border-radius: 14px; background: var(--primary);
+  }
+  .slider-thumb {
+    position: absolute; top: 50%; left: 0; width: 20px; height: 20px; border-radius: 50%;
+    background: #FFFFFF; box-shadow: 0 1px 4px rgba(0,0,0,.2);
+    transform: translate(-50%, -50%);
+    transition: transform .18s cubic-bezier(.34,1.35,.64,1);
+    pointer-events: none;
+  }
+  .slider.active .slider-thumb { transform: translate(-50%, -50%) scale(1.127); }
+
+  /* 卡片内说明文字 */
+  .card-summary { font-size: 14px; color: var(--summary); padding: 6px 16px 16px; line-height: 1.45; }
+
+  /* ===== 按钮（Button：16dp 圆角，最小 40dp 高，13x16 内距，17sp） ===== */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-height: 40px; padding: 10px 16px; border: 0; border-radius: 16px;
+    background: var(--btn-bg); color: var(--btn-text);
+    font-family: inherit; font-size: 16px; font-weight: 500; line-height: 1;
+    cursor: pointer; transition: transform .15s cubic-bezier(.34,1.3,.64,1), filter .15s;
+  }
+  .btn:active { transform: scale(.97); filter: brightness(.96); }
+  .btn.primary { background: var(--primary); color: var(--on-primary); }
+  .btn.block { display: flex; width: calc(100% - 32px); margin: 4px 16px 16px; }
+  .btn.sm { min-height: 36px; font-size: 14px; padding: 8px 14px; border-radius: 14px; }
+  .btn.accent-soft { background: var(--accent-soft); color: var(--accent-soft-on); }
+
+  /* ===== 输入框（TextField：16dp 圆角，secondaryContainer 背景，聚焦 2dp primary 描边） ===== */
+  .input-num, .input-text {
+    flex: none; width: 118px; height: 40px; border-radius: 16px;
+    background: var(--input-bg); border: 2px solid transparent; color: var(--text);
+    padding: 0 12px; font-size: 15px; font-family: inherit;
     text-align: right; font-variant-numeric: tabular-nums;
+    transition: border-color .18s, background .18s;
+    -webkit-appearance: none; appearance: none;
   }
-  input[type=number]:focus, input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
-  button {
-    background: var(--accent); color: #fff; border: 0; border-radius: 15px;
-    padding: 11px 16px; font-size: 15px; font-weight: 600; width: 100%; margin: 6px 0 8px;
-    font-family: inherit; transition: filter .15s;
+  .input-num:focus, .input-text:focus { outline: none; border-color: var(--primary); }
+  .input-num::-webkit-outer-spin-button, .input-num::-webkit-inner-spin-button { -webkit-appearance: none; }
+  input:disabled, button:disabled, .switch.disabled { opacity: .4; }
+
+  /* ===== 日志区 ===== */
+  .log {
+    font-size: 13px; color: var(--summary); font-variant-numeric: tabular-nums;
+    padding: 10px 16px 2px; white-space: pre-wrap; word-break: break-all; line-height: 1.5;
   }
-  button:active { filter: brightness(.85); }
-  button.ghost { background: var(--accent-soft); color: var(--accent); }
-  button.sm { width: auto; padding: 8px 16px; font-size: 13.5px; margin: 2px 4px 2px 0; }
-  .seg { display: flex; gap: 8px; padding: 6px 0 10px; }
-  .seg button { flex: 1; margin: 0; background: var(--seg-bg); color: var(--text); border-radius: 14px; }
-  .seg button.sel { background: var(--accent); color: #fff; }
-  #status {
-    font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--sub);
-    white-space: pre-wrap; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line);
+
+  /* ===== 底部说明（footnote1 13sp） ===== */
+  .footer-hint {
+    font-size: 13px; color: var(--summary);
+    margin: 20px 12px 0; line-height: 1.6;
   }
-  .footer-hint { color: var(--sub); font-size: 12px; margin: 18px 16px 0; line-height: 1.6; }
+
+  /* ===== Toast ===== */
   .toast {
-    position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%);
-    background: rgba(28,28,30,.94); color: #fff; padding: 10px 22px; border-radius: 22px;
-    font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 9;
-    box-shadow: 0 4px 16px rgba(0,0,0,.2);
+    position: fixed; left: 50%; bottom: calc(34px + env(safe-area-inset-bottom));
+    transform: translateX(-50%) translateY(6px);
+    background: var(--toast-bg); color: #fff;
+    padding: 11px 22px; border-radius: 22px;
+    font-size: 14px; max-width: 82vw; text-align: center;
+    opacity: 0; transition: opacity .22s, transform .22s;
+    pointer-events: none; z-index: 30;
+    box-shadow: 0 6px 20px rgba(0,0,0,.18);
   }
-  .toast.show { opacity: 1; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ===== 对话框（SuperDialog：居中卡片 24dp 圆角，标题左对齐，按钮并排） ===== */
+  .dialog-mask {
+    position: fixed; inset: 0; background: var(--dim); z-index: 20;
+    display: flex; align-items: center; justify-content: center; padding: 32px;
+    opacity: 0; transition: opacity .2s; pointer-events: none;
+  }
+  .dialog-mask.show { opacity: 1; pointer-events: auto; }
+  .dialog {
+    background: var(--card); border-radius: 24px; padding: 26px 24px 18px;
+    width: 100%; max-width: 360px;
+    transform: scale(.94); transition: transform .22s cubic-bezier(.34,1.3,.64,1);
+    box-shadow: 0 12px 40px rgba(0,0,0,.22);
+  }
+  .dialog-mask.show .dialog { transform: scale(1); }
+  .dialog-title { font-size: 17px; font-weight: 600; }
+  .dialog-summary { font-size: 14px; color: var(--summary); margin-top: 8px; line-height: 1.5; }
+  .dialog-actions { display: flex; gap: 12px; margin-top: 20px; }
+  .dialog-actions .btn { flex: 1; }
+
+  /* 箭头行（ArrowPreference） */
+  .chevron { flex: none; width: 20px; height: 20px; color: var(--text-2); }
 </style>
 </head>
 <body>
-  <div class="page-title">晕动舒缓显示</div>
 
-  <div class="group-title">运行状态</div>
-  <div class="card">
-    <div class="row">
-      <div class="label"><span class="dot" id="dot-veh"></span>车辆识别</div>
-      <div class="value" id="veh-state">—</div>
+<header class="appbar" id="appbar">
+  <div class="appbar-inner">
+    <div class="appbar-small">晕动舒缓显示</div>
+    <h1 class="appbar-large">晕动舒缓显示</h1>
+  </div>
+</header>
+
+<div class="group-title">运行状态</div>
+<div class="card">
+  <div class="mi-row">
+    <div class="row-main">
+      <div class="row-title">晕动舒缓显示</div>
+      <div class="row-summary">关闭后圆点完全隐藏，等同系统设置中的功能开关</div>
     </div>
-    <div class="row">
-      <div class="label">当前模式</div>
-      <div class="value" id="mode-state">—</div>
+    <span class="switch" id="sw-enable" onclick="toggleEnable()"><span class="knob"></span></span>
+  </div>
+  <div class="mi-row">
+    <div class="row-label"><span class="dot" id="dot-veh"></span><span>车辆识别</span></div>
+    <div class="row-value" id="veh-state">—</div>
+  </div>
+  <div class="mi-row">
+    <div class="row-title">当前模式</div>
+    <div class="row-value" id="mode-state">—</div>
+  </div>
+  <div class="log" id="status">正在读取状态…</div>
+  <button class="btn block" onclick="refreshState(true)">刷新状态</button>
+</div>
+
+<div class="group-title">灵敏度</div>
+<div class="card">
+  <div class="mi-row">
+    <div class="row-title">圆点摆动幅度</div>
+    <div class="row-value" id="gain-v">—</div>
+  </div>
+  <div class="slider" id="gainSlider">
+    <div class="slider-track"><div class="slider-fill" id="gainFill"></div></div>
+    <div class="slider-thumb" id="gainThumb"></div>
+  </div>
+  <div class="card-summary">车晃时圆点滑动的幅度倍数。觉得动得慢就调大，一般 1.5 ~ 3 之间比较明显。松手即保存，约 2 秒生效，无需重启。</div>
+</div>
+
+<div class="group-title">显示模式</div>
+<div class="card">
+  <div class="mi-row pressable" onclick="setMode(2)">
+    <div class="row-main">
+      <div class="row-title">常驻显示</div>
+      <div class="row-summary">圆点始终显示</div>
     </div>
-    <div id="status">正在读取状态…</div>
-    <button class="ghost" onclick="refreshState()">刷新状态</button>
+    <span class="radio" id="m2"></span>
   </div>
-
-  <div class="group-title">灵敏度</div>
-  <div class="card">
-    <div class="row"><div class="label">圆点摆动幅度</div><div class="value" id="gain-v">—</div></div>
-    <input type="range" id="gain" min="0.2" max="10" step="0.1" value="1">
-    <div class="hint">车晃时圆点滑动的幅度倍数。觉得动得慢就调大，一般 1.5 ~ 3 之间比较明显。保存后约 2 秒生效，无需重启。</div>
-    <button onclick="saveGain()">保存灵敏度</button>
-  </div>
-
-  <div class="group-title">显示模式</div>
-  <div class="card">
-    <div class="seg">
-      <button id="m2" onclick="setMode(2)">常驻显示</button>
-      <button id="m1" onclick="setMode(1)">仅车辆运动</button>
+  <div class="mi-row pressable" onclick="setMode(1)">
+    <div class="row-main">
+      <div class="row-title">仅车辆运动</div>
+      <div class="row-summary">车持续移动 8 秒后出现，停车 5 秒后消失</div>
     </div>
-    <div class="hint" style="padding: 0 0 8px">「仅车辆运动」由加速度计识别：车持续动 8 秒后出现，停车 5 秒后消失。</div>
+    <span class="radio" id="m1"></span>
   </div>
+</div>
 
-  <div class="group-title">车辆识别参数</div>
-  <details class="card">
-    <summary style="cursor:pointer; font-weight:600; font-size:15px; padding:12px 0;">进阶阈值（展开调整）</summary>
-    <div class="row"><div class="label">振动能量下限<div class="hint">motion_cues_veh_rms</div></div><input type="number" id="veh_rms" step="0.01"></div>
-    <div class="row"><div class="label">低频占比下限<div class="hint">motion_cues_veh_low，调大更抗手抖</div></div><input type="number" id="veh_low" step="0.05"></div>
-    <div class="row"><div class="label">陀螺上限<div class="hint">motion_cues_veh_rot，调小更严格</div></div><input type="number" id="veh_rot" step="0.01"></div>
-    <div class="row"><div class="label">步态拒绝阈值<div class="hint">motion_cues_veh_step</div></div><input type="number" id="veh_step" step="0.05"></div>
-    <div class="row"><div class="label">进入判定秒数<div class="hint">motion_cues_veh_hold</div></div><input type="number" id="veh_hold" step="1"></div>
-    <button onclick="saveVeh()">保存车辆参数</button>
-  </details>
-  <div class="card">
-    <div class="row" style="padding-bottom:6px">
-      <div class="label">一键恢复默认参数<div class="hint">灵敏度 1.0×、车辆阈值回默认、关闭测试模式；不影响显示模式与功能开关</div></div>
+<div class="group-title">测试</div>
+<div class="card">
+  <div class="mi-row pressable" onclick="setTest(0)">
+    <div class="row-title">关闭测试</div>
+    <span class="radio" id="t0"></span>
+  </div>
+  <div class="mi-row pressable" onclick="setTest(2)">
+    <div class="row-title">模拟车辆</div>
+    <span class="radio" id="t2"></span>
+  </div>
+  <div class="mi-row pressable" onclick="setTest(1)">
+    <div class="row-title">正弦摆动</div>
+    <span class="radio" id="t1"></span>
+  </div>
+</div>
+<div class="card" style="padding:12px 16px 14px; display:flex; gap:12px;">
+  <button class="btn accent-soft" style="flex:1;" onclick="setTest(3)">模拟走路（应拒绝）</button>
+  <button class="btn accent-soft" style="flex:1;" onclick="setTest(4)">手持微动（应拒绝）</button>
+</div>
+<div class="card-summary" style="padding-top:0;">不开车也能看效果：选「模拟车辆」后几秒内圆点应出现（仅车辆模式下）。测完记得关闭测试。</div>
+
+<div class="group-title">车辆识别参数</div>
+<div class="card">
+  <div class="mi-row">
+    <div class="row-main">
+      <div class="row-title">振动能量下限</div>
+      <div class="row-summary">motion_cues_veh_rms</div>
     </div>
-    <button class="ghost" onclick="resetDefaults()">恢复默认参数</button>
+    <input type="number" class="input-num" id="veh_rms" step="0.01">
   </div>
-
-  <div class="group-title">测试</div>
-  <div class="card">
-    <div class="seg">
-      <button onclick="setTest(0)">关闭</button>
-      <button onclick="setTest(2)">模拟车辆</button>
-      <button onclick="setTest(1)">正弦摆动</button>
+  <div class="mi-row">
+    <div class="row-main">
+      <div class="row-title">低频占比下限</div>
+      <div class="row-summary">motion_cues_veh_low，调大更抗手抖</div>
     </div>
-    <div class="hint" style="padding-bottom:6px">不开车也能看效果：选「模拟车辆」后几秒内圆点应出现（仅车辆模式下）。测完记得关闭。</div>
-    <button class="ghost sm" onclick="setTest(3)">模拟走路（应拒绝）</button>
-    <button class="ghost sm" onclick="setTest(4)">手持微动（应拒绝）</button>
+    <input type="number" class="input-num" id="veh_low" step="0.05">
   </div>
-
-  <div class="footer-hint">
-    参数保存在系统 Settings.Secure，卸载模块会被自动清理。改动由注入服务实时读取。<br>
-    手机当前静止时加速度计读数接近 0，属正常现象。
+  <div class="mi-row">
+    <div class="row-main">
+      <div class="row-title">陀螺上限</div>
+      <div class="row-summary">motion_cues_veh_rot，调小更严格</div>
+    </div>
+    <input type="number" class="input-num" id="veh_rot" step="0.01">
   </div>
+  <div class="mi-row">
+    <div class="row-main">
+      <div class="row-title">步态拒绝阈值</div>
+      <div class="row-summary">motion_cues_veh_step</div>
+    </div>
+    <input type="number" class="input-num" id="veh_step" step="0.05">
+  </div>
+  <div class="mi-row">
+    <div class="row-main">
+      <div class="row-title">进入判定秒数</div>
+      <div class="row-summary">motion_cues_veh_hold</div>
+    </div>
+    <input type="number" class="input-num" id="veh_hold" step="1">
+  </div>
+  <button class="btn block" onclick="saveVeh()">保存车辆参数</button>
+</div>
 
-  <div class="toast" id="toast"></div>
+<div class="card" style="margin-top:8px;">
+  <div class="mi-row pressable" onclick="openResetDialog()">
+    <div class="row-main">
+      <div class="row-title">恢复默认参数</div>
+      <div class="row-summary">灵敏度 1.0×、车辆阈值回默认、关闭测试模式</div>
+    </div>
+    <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+  </div>
+</div>
+
+<div class="footer-hint">
+  参数保存在系统 Settings.Secure，卸载模块会被自动清理。改动由注入服务实时读取。<br>
+  手机当前静止时加速度计读数接近 0，属正常现象。
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="dialog-mask" id="dlg-reset" onclick="if(event.target===this)closeResetDialog()">
+  <div class="dialog">
+    <div class="dialog-title">恢复默认参数？</div>
+    <div class="dialog-summary">灵敏度与车辆识别阈值将全部恢复为默认值。显示模式与功能开关不受影响。</div>
+    <div class="dialog-actions">
+      <button class="btn" onclick="closeResetDialog()">取消</button>
+      <button class="btn primary" onclick="doReset()">恢复默认</button>
+    </div>
+  </div>
+</div>
 
 <script>
 // ---------- KernelSU 桥接（兼容官方/Next 两种注入方式） ----------
@@ -187,54 +431,104 @@ function toast(msg) {
   clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 1800);
 }
 
+// ---------- 顶栏折叠（miuix TopAppBar 行为） ----------
+(function () {
+  const bar = document.getElementById('appbar');
+  const update = () => bar.classList.toggle('collapsed', (window.scrollY || 0) > 22);
+  window.addEventListener('scroll', update, { passive: true });
+  update();
+})();
+
 // ---------- 状态 ----------
 let lastRaw = '';
-async function refreshState() {
+async function refreshState(manual) {
   try {
     const r = await exec(
       "su -c 'grep -h \"state:\" /data/adb/lspd/log/modules_*.log 2>/dev/null | tail -1'");
     const line = (r.stdout || '').trim();
-    if (!line) { document.getElementById('status').textContent = '暂无运行日志'; return; }
+    if (!line) { document.getElementById('status').textContent = '暂无运行日志'; if (manual) toast('暂无运行日志'); return; }
     const m = line.replace(/^.*AntiDizzyBridge:\s*/, '');
-    if (m === lastRaw) return;
-    lastRaw = m;
-    document.getElementById('status').textContent = m;
-
+    if (m !== lastRaw || manual) {
+      lastRaw = m;
+      document.getElementById('status').textContent = m;
+    }
     const veh = /veh=true/.test(m);
     const modeM = m.match(/mode=(\d)/);
     const mode = modeM ? modeM[1] : '?';
     document.getElementById('veh-state').textContent = veh ? '在车上' : '未检测到车辆';
-    document.getElementById('dot-veh').className = 'dot ' + (veh ? 'on' : 'off');
+    document.getElementById('dot-veh').className = 'dot ' + (veh ? 'on' : '');
     document.getElementById('mode-state').textContent = mode === '2' ? '常驻显示' : mode === '1' ? '仅车辆运动' : mode;
-    document.getElementById('m1').classList.toggle('sel', mode === '1');
-    document.getElementById('m2').classList.toggle('sel', mode === '2');
+    syncRadios('m', mode === '1' ? '1' : mode === '2' ? '2' : null);
   } catch (e) {
     document.getElementById('status').textContent = '读取失败: ' + e.message;
   }
 }
 
-// ---------- 灵敏度 ----------
+// ---------- 功能开关 ----------
+async function loadEnable() {
+  const v = await getSetting('oplus_customize_antidizzy_enable');
+  document.getElementById('sw-enable').classList.toggle('on', v === '1');
+}
+async function toggleEnable() {
+  const sw = document.getElementById('sw-enable');
+  const on = !sw.classList.contains('on');
+  sw.classList.toggle('on', on);
+  try {
+    await putSetting('oplus_customize_antidizzy_enable', on ? 1 : 0);
+    toast(on ? '晕动舒缓显示已开启' : '晕动舒缓显示已关闭');
+    refreshState();
+  } catch (e) {
+    sw.classList.toggle('on', !on);
+    toast('保存失败：' + e.message);
+  }
+}
+
+// ---------- 灵敏度（miuix Slider） ----------
+const GAIN_MIN = 0.2, GAIN_MAX = 10;
+function gainToFrac(v) { return (v - GAIN_MIN) / (GAIN_MAX - GAIN_MIN); }
+function fracToGain(f) { return GAIN_MIN + f * (GAIN_MAX - GAIN_MIN); }
+function renderGain(v) {
+  const f = Math.max(0, Math.min(1, gainToFrac(v)));
+  document.getElementById('gainFill').style.width = (f * 100) + '%';
+  document.getElementById('gainThumb').style.left = (f * 100) + '%';
+  document.getElementById('gain-v').textContent = v.toFixed(1) + '×';
+}
+function bindGainSlider() {
+  const el = document.getElementById('gainSlider');
+  let cur = 1.0;
+  const setFromEvent = (e) => {
+    const rect = el.getBoundingClientRect();
+    const f = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    cur = Math.round(fracToGain(f) * 10) / 10;
+    renderGain(cur);
+  };
+  el.addEventListener('pointerdown', (e) => {
+    el.setPointerCapture(e.pointerId);
+    el.classList.add('active');
+    setFromEvent(e);
+  });
+  el.addEventListener('pointermove', (e) => { if (el.classList.contains('active')) setFromEvent(e); });
+  const release = async (e) => {
+    if (!el.classList.contains('active')) return;
+    el.classList.remove('active');
+    setFromEvent(e);
+    try {
+      await putSetting('motion_cues_gain', cur.toFixed(1));
+      toast('灵敏度已保存：' + cur.toFixed(1) + '×');
+    } catch (err) { toast('保存失败：' + err.message); }
+  };
+  el.addEventListener('pointerup', release);
+  el.addEventListener('pointercancel', release);
+}
 async function loadGain() {
   const v = await getSetting('motion_cues_gain');
   const g = v && parseFloat(v) > 0 ? parseFloat(v) : 1.0;
-  document.getElementById('gain').value = g;
-  document.getElementById('gain-v').textContent = g.toFixed(1) + '×';
-}
-function bindGain() {
-  const el = document.getElementById('gain');
-  el.addEventListener('input', () => {
-    document.getElementById('gain-v').textContent = parseFloat(el.value).toFixed(1) + '×';
-  });
-  el.addEventListener('change', () => saveGain(true));
-}
-async function saveGain(silent) {
-  const v = parseFloat(document.getElementById('gain').value).toFixed(1);
-  await putSetting('motion_cues_gain', v);
-  if (!silent) toast('灵敏度已保存：' + v + '×');
+  renderGain(g);
 }
 
 // ---------- 模式 ----------
 async function setMode(m) {
+  syncRadios('m', String(m));
   await putSetting('oplus_customize_antidizzy_mode', m);
   toast(m === 2 ? '已切换：常驻显示' : '已切换：仅车辆运动');
   refreshState();
@@ -242,8 +536,21 @@ async function setMode(m) {
 
 // ---------- 测试 ----------
 async function setTest(v) {
+  syncRadios('t', String(v));
   await putSetting('motion_cues_bridge_test', v);
   toast(v === 0 ? '测试已关闭' : '测试模式 ' + v + ' 已开启');
+}
+function syncRadios(prefix, val) {
+  for (const el of document.querySelectorAll('[id^="' + prefix + '"]')) {
+    if (el.classList.contains('radio')) {
+      el.classList.toggle('sel', el.id === prefix + val);
+    }
+  }
+}
+async function loadTest() {
+  const v = await getSetting('motion_cues_bridge_test');
+  const n = ['0', '1', '2'].includes(v) ? v : '0';
+  syncRadios('t', n);
 }
 
 // ---------- 车辆参数 ----------
@@ -268,7 +575,7 @@ async function saveVeh() {
   toast('车辆参数已保存，约 2 秒生效');
 }
 
-// ---------- 恢复默认 ----------
+// ---------- 恢复默认（SuperDialog） ----------
 const DEFAULTS = {
   motion_cues_gain: 1.0,
   motion_cues_veh_rms: 0.12,
@@ -278,11 +585,13 @@ const DEFAULTS = {
   motion_cues_veh_hold: 8,
   motion_cues_bridge_test: 0,
 };
-async function resetDefaults() {
-  if (!confirm('将灵敏度与车辆识别阈值全部恢复为默认值？\n（不影响显示模式与功能开关）')) return;
+function openResetDialog() { document.getElementById('dlg-reset').classList.add('show'); }
+function closeResetDialog() { document.getElementById('dlg-reset').classList.remove('show'); }
+async function doReset() {
+  closeResetDialog();
   try {
     for (const k in DEFAULTS) await putSetting(k, DEFAULTS[k]);
-    await Promise.all([loadGain(), loadVeh()]);
+    await Promise.all([loadGain(), loadVeh(), loadTest()]);
     await refreshState();
     toast('已恢复默认参数');
   } catch (e) { toast('恢复失败：' + e.message); }
@@ -290,14 +599,17 @@ async function resetDefaults() {
 
 // ---------- 初始化 ----------
 (async () => {
+  bindGainSlider();
   if (!bridge()) {
     document.getElementById('status').textContent =
       '未检测到 KernelSU 环境。请在 KernelSU 管理器 → 模块 → 晕动舒缓显示 → WebUI 打开本页面。';
-    document.querySelectorAll('button, input, select, summary').forEach(el => el.disabled = true);
+    document.querySelectorAll('button, input, .switch, .mi-row').forEach(el => {
+      el.disabled = true;
+      el.style.pointerEvents = 'none';
+    });
     return;
   }
-  bindGain();
-  await Promise.all([loadGain(), loadVeh(), refreshState()]);
+  await Promise.all([loadGain(), loadVeh(), loadEnable(), loadTest(), refreshState()]);
   setInterval(refreshState, 3000);
 })();
 </script>
