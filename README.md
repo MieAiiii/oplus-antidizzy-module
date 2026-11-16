@@ -72,6 +72,15 @@ ColorOS 16 的「晕动舒缓显示」（设置 → 辅助功能）会在屏幕�
 
 ## 更新日志
 
+### v7.3
+
+**WebUI 按 miuix 官方源码规范全面重构**（compose-miuix-ui/miuix，1.6k★）
+- 颜色、字体、组件尺寸逐项对齐源码：`Colors.kt` 全部色值（含 `sliderBackground` 6% 黑轨道）、`TextStyles.kt` 字号表、`SmallTitle` 内边距 28dp、`Button` 17sp、`Slider` 左右留白 14dp（thumbRadius）
+- **移除滑块与开关的阴影**——官方 `drawCircle` 为纯实心绘制，无投影
+- 卡片 16dp / 弹窗 32dp 采用 **squircle 超椭圆平滑圆角**（`corner-shape`，对应 miuix-squircle）
+- 新增 miuix 交互反馈：滑杆拖拽时轨道叠加 4.4% 黑蒙版、列表行按压 Sink 下沉（scale .985）
+- 列表去掉选项间分割线，行高提升至 64dp、上下内距 16dp，更符合 miuix「留白即分隔」的呼吸节奏
+
 ### v7.1
 
 - **修复：竖持静止时圆点因重力漂移**。竖持时重力在 X/Y 投影大，线性加速度计的重力补偿在缓慢倾斜时会泄漏毫级伪加速度，叠加手持缓晃后被前置增益放大、越过原厂 0.196 m/s² 死区，表现为"明明没动圆点却在漂"。

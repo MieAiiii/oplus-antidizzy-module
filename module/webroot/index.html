@@ -5,244 +5,286 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>晕动舒缓显示</title>
 <style>
-  /* ===== miuix / HyperOS 设计 Token（自 compose-miuix-ui/miuix 源码提取）=====
-     颜色：theme/Colors.kt · 字体：theme/TextStyles.kt
-     卡片 16dp 圆角 · 行 56dp/16dp 内距 · 开关 49x28/20dp
-     滑杆轨道 28dp · 白色滑块 20dp · 按钮 16dp 圆角/40dp 高/17sp */
+  /* =========================================================================
+     miuix / HyperOS 设计规范实现
+     取值来源：compose-miuix-ui/miuix（1.6k★，官方 HyperOS 设计语言实现）
+       theme/Colors.kt     —— lightColorScheme 全部色值
+       theme/TextStyles.kt —— 字号表（main 17 / headline1 17 / body2 14 / ...）
+       basic/Card.kt       —— 圆角 16dp + squircle 平滑圆角，surfaceContainer
+       basic/Component.kt  —— 行最小高度 56dp，内侧 16dp，标题 17sp Medium
+       basic/SmallTitle.kt —— subtitle(14sp Bold)，PaddingValues(28, 8)
+       basic/Switch.kt     —— 49×28dp，thumb 20dp，偏移 4/25dp，无阴影
+       basic/Slider.kt     —— 高 28dp，thumb = 0.72H（20.16dp），无阴影，
+                              左右留白 = H/2（14dp），拖拽轨道加深 4.4%
+       basic/Button.kt     —— 40dp 高，16dp 圆角，17sp Medium
+     ========================================================================= */
   :root {
     color-scheme: light dark;
+    /* ---- lightColorScheme（官方值） ---- */
     --primary: #3482FF;
     --on-primary: #FFFFFF;
-    --surface: #F7F7F7;            /* 页面背景 */
-    --card: #FFFFFF;               /* surfaceContainer */
-    --text: #000000;               /* onBackground */
-    --title-sub: #8C93B0;          /* onBackgroundVariant 组标题 */
-    --summary: rgba(0,0,0,.60);    /* onSurfaceVariantSummary */
-    --text-2: #959595;             /* onSurfaceContainerVariant */
-    --accent-soft: #EAF2FF;        /* tertiaryContainer */
-    --accent-soft-on: #3482FF;
-    --btn-bg: #F0F0F0;             /* secondaryVariant */
-    --btn-text: #303030;
-    --input-bg: #F0F0F0;           /* secondaryContainer */
-    --switch-off: #E6E6E6;         /* secondary */
-    --divider: #E0E0E0;
-    --slider-bg: rgba(0,0,0,.06);
+    --background: #FFFFFF;
+    --surface: #F7F7F7;             /* 页面背景 */
+    --card: #FFFFFF;                /* surfaceContainer */
+    --on-surface: #000000;
+    --on-surface-secondary: rgba(0,0,0,.80);   /* onSurfaceSecondary 0xCC000000 */
+    --summary: rgba(0,0,0,.60);                /* onSurfaceVariantSummary 0x99000000 */
+    --actions: rgba(0,0,0,.40);                /* onSurfaceVariantActions 0x66000000 */
+    --on-bg-variant: #8C93B0;       /* onBackgroundVariant 组标题 */
+    --secondary: #E6E6E6;           /* 开关未选中轨道 */
+    --secondary-variant: #F0F0F0;
+    --tertiary-container: #EAF2FF;
+    --divider: #E0E0E0;             /* dividerLine */
+    --outline: #D9D9D9;
+    --slider-bg: rgba(0,0,0,.06);   /* sliderBackground 0x0F000000 */
+    --error: #E94634;
     --press: rgba(0,0,0,.05);
-    --dim: rgba(0,0,0,.3);
+    --dim: rgba(0,0,0,.30);         /* windowDimming */
     --toast-bg: rgba(28,28,30,.92);
+    /* miuix 弹簧近似：spring(dampingRatio .7, stiffness 987) */
+    --spring: cubic-bezier(.32, 1.32, .56, 1);
+    --smooth: cubic-bezier(.4, 0, .2, 1);
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --primary: #277AF7;
+      --background: #000000;
       --surface: #000000;
       --card: #242424;
-      --text: rgba(255,255,255,.90);
-      --title-sub: #787E96;
+      --on-surface: rgba(255,255,255,.90);
+      --on-surface-secondary: rgba(255,255,255,.70);
       --summary: rgba(255,255,255,.50);
-      --text-2: #737373;
-      --accent-soft: #2B3B54;
-      --accent-soft-on: #4788FF;
-      --btn-bg: #434343;
-      --btn-text: #D9D9D9;
-      --input-bg: #434343;
-      --switch-off: #505050;
+      --actions: rgba(255,255,255,.30);
+      --on-bg-variant: #787E96;
+      --secondary: #505050;
+      --secondary-variant: #434343;
+      --tertiary-container: #2B3B54;
       --divider: #393939;
+      --outline: #4A4A4A;
       --slider-bg: rgba(255,255,255,.15);
       --press: rgba(255,255,255,.06);
-      --dim: rgba(0,0,0,.6);
+      --dim: rgba(0,0,0,.60);
       --toast-bg: rgba(70,70,72,.95);
     }
   }
+
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html { background: var(--surface); }
   body {
     margin: 0 auto; max-width: 560px; padding: 0 16px calc(40px + env(safe-area-inset-bottom));
-    background: var(--surface); color: var(--text);
+    background: var(--surface); color: var(--on-surface);
     font-family: MiSans, "MiSans VF", "HarmonyOS Sans SC", "OPPO Sans", "PingFang SC",
                  "Noto Sans CJK SC", system-ui, sans-serif;
-    font-size: 17px; line-height: 1.45;
+    font-size: 17px; line-height: 1.45;               /* main = 17sp */
+    -webkit-font-smoothing: antialiased;
   }
 
-  /* ===== 顶栏（miuix TopAppBar：大标题 32sp，折叠为居中 20sp Medium） ===== */
+  /* ===== TopAppBar：大标题 32sp（title1），折叠为居中 20sp（title3） ===== */
   .appbar {
     position: sticky; top: 0; z-index: 8; margin: 0 -16px;
-    padding: env(safe-area-inset-top) 26px 0;
+    padding: env(safe-area-inset-top) 16px 0;          /* 与大标题 16dp 起始边距对齐 */
     background: transparent;
-    transition: background .22s ease;
+    transition: background .22s var(--smooth);
   }
   .appbar-inner { position: relative; }
   .appbar-large {
-    margin: 0; font-size: 32px; font-weight: 500; letter-spacing: .2px;
-    padding: 14px 0 12px; max-height: 64px;
-    transition: opacity .16s ease, max-height .2s ease, padding .2s ease, transform .16s ease;
+    margin: 0; font-size: 32px; font-weight: 600; letter-spacing: .2px;
+    padding: 12px 0 10px; max-height: 62px;
+    transition: opacity .16s var(--smooth), max-height .2s var(--smooth),
+                padding .2s var(--smooth), transform .16s var(--smooth);
   }
   .appbar-small {
     position: absolute; top: 0; left: 0; right: 0; height: 52px;
     display: flex; align-items: center; justify-content: center;
     font-size: 20px; font-weight: 500;
     opacity: 0; transform: translateY(10px);
-    transition: opacity .16s ease, transform .18s ease;
+    transition: opacity .16s var(--smooth), transform .18s var(--smooth);
     pointer-events: none;
   }
+  /* miuix-blur：折叠后毛玻璃（surface 62% + blur 20 + saturate） */
   .appbar.collapsed { background: color-mix(in srgb, var(--surface) 86%, transparent); }
   @supports (backdrop-filter: blur(1px)) {
     .appbar.collapsed {
       background: color-mix(in srgb, var(--surface) 62%, transparent);
-      -webkit-backdrop-filter: blur(20px) saturate(1.6);
-      backdrop-filter: blur(20px) saturate(1.6);
+      -webkit-backdrop-filter: blur(20px) saturate(1.8);
+      backdrop-filter: blur(20px) saturate(1.8);
     }
   }
   .appbar.collapsed .appbar-large { opacity: 0; max-height: 0; padding: 0; transform: scale(.98); }
   .appbar.collapsed .appbar-small { opacity: 1; transform: translateY(0); }
 
-  /* ===== 组标题（SmallTitle：14sp Bold，onBackgroundVariant，28dp/8dp） ===== */
+  /* ===== SmallTitle：subtitle(14sp Bold) + onBackgroundVariant + PaddingValues(28, 8) ===== */
   .group-title {
-    font-size: 14px; font-weight: 700; color: var(--title-sub);
-    margin: 14px 0 8px; padding: 0 12px;
+    font-size: 14px; font-weight: 700; color: var(--on-bg-variant);
+    padding: 0 28px; margin: 14px 0 6px;
+    letter-spacing: .1px;
   }
 
-  /* ===== 卡片（Card：16dp squircle 圆角，surfaceContainer） ===== */
+  /* ===== Card：16dp squircle 平滑圆角（miuix-squircle），surfaceContainer，无阴影 ===== */
   .card {
-    background: var(--card); border-radius: 16px; overflow: hidden;
-    margin-bottom: 4px;
+    background: var(--card);
+    border-radius: 16px;
+    corner-shape: squircle;         /* Chrome 133+：超椭圆平滑圆角（miuix squircle） */
+    overflow: hidden;
+    margin-bottom: 12px;            /* miuix 卡片间距 12dp */
   }
+  .card:last-child { margin-bottom: 0; }
 
-  /* ===== 行（BasicComponent：最小 56dp，16dp 内距，标题 17sp Medium，摘要 14sp） ===== */
+  /* ===== BasicComponent：minHeight 64dp（宽松版），InsideMargin 16dp，标题 17sp Medium ===== */
   .mi-row {
-    position: relative; min-height: 56px; padding: 12px 16px;
+    position: relative; min-height: 64px; padding: 16px;
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
   }
-  .mi-row + .mi-row::before {
+  /* 行间分隔线：已按需求关闭（如需恢复把下面规则取消注释） */
+  /* .mi-row + .mi-row::before {
     content: ''; position: absolute; top: 0; left: 16px; right: 16px;
     height: 1px; background: var(--divider);
-  }
-  .mi-row.pressable:active { background: var(--press); }
+  } */
+  /* miuix PressFeedbackType.Sink：按下轻微下沉 + 变暗 */
+  .mi-row.pressable { transition: transform .16s var(--spring), background .16s var(--smooth); }
+  .mi-row.pressable:active { transform: scale(.985); background: var(--press); }
   .row-main { flex: 1; min-width: 0; }
-  .row-title { font-size: 17px; font-weight: 500; }
-  .row-summary { font-size: 14px; color: var(--summary); margin-top: 2px; line-height: 1.4; }
-  .row-value { font-size: 17px; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .row-title { font-size: 17px; font-weight: 500; }      /* headline1 + Medium */
+  .row-summary { font-size: 14px; color: var(--summary); margin-top: 4px; line-height: 1.45; }
+  .row-value { font-size: 17px; color: var(--summary); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .row-label { display: flex; align-items: center; font-size: 17px; font-weight: 500; }
 
   /* 状态圆点 */
-  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 10px; background: var(--text-2); }
-  .dot.on { background: var(--primary); box-shadow: 0 0 7px color-mix(in srgb, var(--primary) 60%, transparent); }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 10px; background: var(--actions); }
+  .dot.on { background: var(--primary); }
 
-  /* ===== 开关（Switch：轨道 49x28 胶囊，滑块 20dp，开=primary 关=secondary） ===== */
+  /* ===== Switch：49×28dp 胶囊轨道，20dp thumb，偏移 unchecked 4dp / checked 25dp，
+            thumb 纯实心白圆无阴影（官方 drawCircle），按下 1.127x ===== */
   .switch {
     flex: none; position: relative; width: 49px; height: 28px; border-radius: 14px;
-    background: var(--switch-off); transition: background .22s cubic-bezier(.4,0,.2,1);
+    background: var(--secondary);
+    transition: background .3s var(--smooth);
     cursor: pointer;
   }
   .switch .knob {
     position: absolute; top: 4px; left: 4px; width: 20px; height: 20px; border-radius: 50%;
-    background: #FFFFFF; box-shadow: 0 1px 3px rgba(0,0,0,.22);
-    transition: left .22s cubic-bezier(.34,1.25,.64,1), transform .18s cubic-bezier(.34,1.25,.64,1);
+    background: #FFFFFF;
+    transition: left .3s var(--spring), transform .18s var(--spring);
   }
   .switch:active .knob { transform: scale(1.127); }
   .switch.on { background: var(--primary); }
   .switch.on .knob { left: 25px; }
   .switch.disabled { opacity: .4; pointer-events: none; }
 
-  /* ===== 单选（RadioButton：primary 圆点 + 外圈） ===== */
+  /* ===== RadioButton：22dp 外圈 + 11dp primary 圆点 ===== */
   .radio {
     flex: none; width: 22px; height: 22px; border-radius: 50%;
-    border: 2px solid var(--text-2); position: relative; transition: border-color .18s;
+    border: 2px solid var(--actions); position: relative;
+    transition: border-color .2s var(--smooth);
   }
   .radio::after {
     content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; margin: auto;
     width: 11px; height: 11px;
-    border-radius: 50%; background: var(--primary); transform: scale(0); transition: transform .2s cubic-bezier(.34,1.4,.64,1);
+    border-radius: 50%; background: var(--primary);
+    transform: scale(0); transition: transform .22s var(--spring);
   }
   .radio.sel { border-color: var(--primary); }
   .radio.sel::after { transform: scale(1); }
 
-  /* ===== 滑杆（Slider：28dp 胶囊轨道，填充 primary，白色 20dp 滑块，按压 1.127 倍） ===== */
-  .slider { position: relative; height: 28px; margin: 10px 16px 6px; touch-action: none; cursor: pointer; }
+  /* ===== Slider：高 28dp（整个组件即胶囊轨道 14dp 圆角），
+            thumb = 0.72 × 28 ≈ 20px 纯白实心无阴影，
+            左右留白 = 14dp（thumbRadius），
+            拖拽时轨道叠加 4.4% 黑蒙版，thumb 放大 1.127 ===== */
+  .slider {
+    position: relative; height: 28px; margin: 12px 16px 10px;
+    touch-action: none; cursor: pointer; isolation: isolate;
+  }
   .slider-track {
     position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 14px;
     background: var(--slider-bg); overflow: hidden;
   }
+  .slider-track::after {              /* 拖拽加深：drawRect(Black, alpha .044) */
+    content: ''; position: absolute; inset: 0; border-radius: inherit;
+    background: rgba(0,0,0,.044); opacity: 0; transition: opacity .15s var(--smooth);
+  }
+  .slider.active .slider-track::after { opacity: 1; }
   .slider-fill {
-    position: absolute; left: 0; top: 0; bottom: 0; width: 24px;
-    border-radius: 14px; background: var(--primary);
-    transition: width .25s cubic-bezier(.4,0,.2,1);
+    position: absolute; left: 0; top: 0; bottom: 0; width: 28px;
+    border-radius: 14px; background: var(--primary);    /* StrokeCap.Round：圆头半径 14 */
+    transition: width .25s var(--smooth);
   }
   .slider-thumb {
-    position: absolute; top: 50%; left: 10px; width: 20px; height: 20px; border-radius: 50%;
-    background: #FFFFFF; box-shadow: 0 1px 4px rgba(0,0,0,.2);
+    position: absolute; top: 50%; left: 14px; width: 20px; height: 20px; border-radius: 50%;
+    background: #FFFFFF;                                /* onPrimary，无阴影 */
     transform: translate(-50%, -50%);
-    transition: left .25s cubic-bezier(.4,0,.2,1), transform .18s cubic-bezier(.34,1.35,.64,1);
+    transition: left .25s var(--smooth), transform .18s var(--spring);
     pointer-events: none;
   }
   .slider.active .slider-thumb { transform: translate(-50%, -50%) scale(1.127); }
   .slider.active .slider-fill, .slider.active .slider-thumb { transition: none; }
 
-  /* 卡片内说明文字 */
+  /* 卡片内说明（onSurfaceVariantSummary 60%） */
   .card-summary { font-size: 14px; color: var(--summary); padding: 6px 16px 16px; line-height: 1.45; }
 
-  /* ===== 按钮（Button：16dp 圆角，最小 40dp 高，13x16 内距，17sp） ===== */
+  /* ===== Button：最小 40dp 高，16dp 圆角，17sp Medium，13×16 内距 ===== */
   .btn {
     display: inline-flex; align-items: center; justify-content: center;
     min-height: 40px; padding: 10px 16px; border: 0; border-radius: 16px;
-    background: var(--btn-bg); color: var(--btn-text);
-    font-family: inherit; font-size: 16px; font-weight: 500; line-height: 1;
-    cursor: pointer; transition: transform .15s cubic-bezier(.34,1.3,.64,1), filter .15s;
+    background: var(--secondary-variant); color: var(--on-surface);
+    font-family: inherit; font-size: 17px; font-weight: 500; line-height: 1;
+    cursor: pointer; transition: transform .15s var(--spring), filter .15s var(--smooth);
   }
   .btn:active { transform: scale(.97); filter: brightness(.96); }
   .btn.primary { background: var(--primary); color: var(--on-primary); }
   .btn.block { display: flex; width: calc(100% - 32px); margin: 4px 16px 16px; }
-  .btn.sm { min-height: 36px; font-size: 14px; padding: 8px 14px; border-radius: 14px; }
-  .btn.accent-soft { background: var(--accent-soft); color: var(--accent-soft-on); }
+  .btn.sm { min-height: 36px; font-size: 15px; padding: 8px 14px; border-radius: 14px; }
+  .btn.accent-soft { background: var(--tertiary-container); color: var(--primary); }
 
-  /* ===== 输入框（TextField：16dp 圆角，secondaryContainer 背景，聚焦 2dp primary 描边） ===== */
+  /* ===== TextField：40dp 高，16dp 圆角，secondaryVariant 背景，聚焦 2dp primary 描边 ===== */
   .input-num, .input-text {
     flex: none; width: 118px; height: 40px; border-radius: 16px;
-    background: var(--input-bg); border: 2px solid transparent; color: var(--text);
-    padding: 0 12px; font-size: 15px; font-family: inherit;
+    background: var(--secondary-variant); border: 2px solid transparent; color: var(--on-surface);
+    padding: 0 12px; font-size: 16px; font-family: inherit;
     text-align: right; font-variant-numeric: tabular-nums;
-    transition: border-color .18s, background .18s;
+    transition: border-color .18s var(--smooth), background .18s var(--smooth);
     -webkit-appearance: none; appearance: none;
   }
   .input-num:focus, .input-text:focus { outline: none; border-color: var(--primary); }
   .input-num::-webkit-outer-spin-button, .input-num::-webkit-inner-spin-button { -webkit-appearance: none; }
   input:disabled, button:disabled, .switch.disabled { opacity: .4; }
 
-  /* ===== 日志区 ===== */
+  /* ===== 日志（footnote1 13sp，tabular） ===== */
   .log {
     font-size: 13px; color: var(--summary); font-variant-numeric: tabular-nums;
-    padding: 10px 16px 2px; white-space: pre-wrap; word-break: break-all; line-height: 1.5;
+    padding: 8px 16px 4px; white-space: pre-wrap; word-break: break-all; line-height: 1.5;
   }
 
   /* ===== 底部说明（footnote1 13sp） ===== */
   .footer-hint {
     font-size: 13px; color: var(--summary);
-    margin: 20px 12px 0; line-height: 1.6;
+    margin: 16px 12px 0; line-height: 1.6;
   }
 
-  /* ===== Toast ===== */
+  /* ===== Toast（miuix Snackbar：胶囊，深色底） ===== */
   .toast {
     position: fixed; left: 50%; bottom: calc(34px + env(safe-area-inset-bottom));
-    transform: translateX(-50%) translateY(6px);
+    transform: translateX(-50%) translateY(6px) scale(.96);
     background: var(--toast-bg); color: #fff;
     padding: 11px 22px; border-radius: 22px;
     font-size: 14px; max-width: 82vw; text-align: center;
-    opacity: 0; transition: opacity .22s, transform .22s;
+    opacity: 0; transition: opacity .22s var(--smooth), transform .22s var(--spring);
     pointer-events: none; z-index: 30;
     box-shadow: 0 6px 20px rgba(0,0,0,.18);
   }
-  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 
-  /* ===== 对话框（SuperDialog：居中卡片 24dp 圆角，标题左对齐，按钮并排） ===== */
+  /* ===== Dialog：居中卡片 32dp squircle（官方 Centered dialog corner radius 32dp） ===== */
   .dialog-mask {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--dim); z-index: 20;
     display: flex; align-items: center; justify-content: center; padding: 32px;
-    opacity: 0; transition: opacity .2s; pointer-events: none;
+    opacity: 0; transition: opacity .2s var(--smooth); pointer-events: none;
   }
   .dialog-mask.show { opacity: 1; pointer-events: auto; }
   .dialog {
-    background: var(--card); border-radius: 24px; padding: 26px 24px 18px;
+    background: var(--card); border-radius: 32px; corner-shape: squircle;
+    padding: 26px 24px 18px;
     width: 100%; max-width: 360px;
-    transform: scale(.94); transition: transform .22s cubic-bezier(.34,1.3,.64,1);
+    transform: scale(.94); transition: transform .24s var(--spring);
     box-shadow: 0 12px 40px rgba(0,0,0,.22);
   }
   .dialog-mask.show .dialog { transform: scale(1); }
@@ -251,8 +293,11 @@
   .dialog-actions { display: flex; gap: 12px; margin-top: 20px; }
   .dialog-actions .btn { flex: 1; }
 
-  /* 箭头行（ArrowPreference） */
-  .chevron { flex: none; width: 20px; height: 20px; color: var(--text-2); }
+  /* 箭头（ArrowPreference） */
+  .chevron { flex: none; width: 20px; height: 20px; color: var(--actions); }
+
+  /* 卡片内的按钮行（自定义布局时使用） */
+  .card-row-btns { padding: 12px 16px 16px; display: flex; gap: 12px; }
 </style>
 </head>
 <body>
@@ -354,11 +399,13 @@
     <span class="radio" id="t5"></span>
   </div>
 </div>
-<div class="card" style="padding:12px 16px 14px; display:flex; gap:12px;">
-  <button class="btn accent-soft" style="flex:1;" onclick="setTest(3)">模拟走路（应拒绝）</button>
-  <button class="btn accent-soft" style="flex:1;" onclick="setTest(4)">手持微动（应拒绝）</button>
+<div class="card">
+  <div class="card-row-btns">
+    <button class="btn accent-soft block" style="margin:0;flex:1;" onclick="setTest(3)">模拟走路（应拒绝）</button>
+    <button class="btn accent-soft block" style="margin:0;flex:1;" onclick="setTest(4)">手持微动（应拒绝）</button>
+  </div>
 </div>
-<div class="card-summary" style="padding-top:0;">不开车也能看效果：选「模拟车辆」后几秒内圆点应出现（仅车辆模式下）。测完记得关闭测试。</div>
+<div class="card-summary" style="padding:0 16px 8px;">不开车也能看效果：选「模拟车辆」后几秒内圆点应出现（仅车辆模式下）。测完记得关闭测试。</div>
 
 <div class="group-title">车辆识别参数</div>
 <div class="card">
@@ -400,7 +447,7 @@
   <button class="btn block" onclick="saveVeh()">保存车辆参数</button>
 </div>
 
-<div class="card" style="margin-top:8px;">
+<div class="card">
   <div class="mi-row pressable" onclick="openResetDialog()">
     <div class="row-main">
       <div class="row-title">恢复默认参数</div>
@@ -510,8 +557,8 @@ async function toggleEnable() {
 }
 
 // ---------- 灵敏度（miuix Slider，可复用多实例） ----------
-const THUMB_R = 10; // 滑块半径：圆心限制在 [R, w-R]，任何位置都不被卡片裁切
-const RAIL_R = 14;  // 填充条圆头半径 = 轨道半高（miuix StrokeCap.Round），包裹白色滑块露出 4px 蓝边
+const THUMB_R = 14; // 官方 thumbRadius = H/2 = 14dp：滑块圆心限制在 [R, w-R]
+const RAIL_R = 14;  // 填充条圆头半径 = 轨道半高（StrokeCap.Round），蓝色包裹白色滑块
 
 function makeSlider(id, opts) {
   const el = document.getElementById(id);
