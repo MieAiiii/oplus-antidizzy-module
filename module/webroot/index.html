@@ -113,7 +113,7 @@
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
   }
   .mi-row + .mi-row::before {
-    content: ''; position: absolute; top: 0; left: 16px; right: 0;
+    content: ''; position: absolute; top: 0; left: 16px; right: 16px;
     height: 1px; background: var(--divider);
   }
   .mi-row.pressable:active { background: var(--press); }
@@ -149,30 +149,33 @@
     border: 2px solid var(--text-2); position: relative; transition: border-color .18s;
   }
   .radio::after {
-    content: ''; position: absolute; inset: 0; margin: auto; width: 11px; height: 11px;
+    content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; margin: auto;
+    width: 11px; height: 11px;
     border-radius: 50%; background: var(--primary); transform: scale(0); transition: transform .2s cubic-bezier(.34,1.4,.64,1);
   }
   .radio.sel { border-color: var(--primary); }
   .radio.sel::after { transform: scale(1); }
 
   /* ===== 滑杆（Slider：28dp 胶囊轨道，填充 primary，白色 20dp 滑块，按压 1.127 倍） ===== */
-  .slider { position: relative; height: 28px; margin: 10px 4px 2px; touch-action: none; cursor: pointer; }
+  .slider { position: relative; height: 28px; margin: 10px 16px 6px; touch-action: none; cursor: pointer; }
   .slider-track {
-    position: absolute; inset: 0; border-radius: 14px;
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 14px;
     background: var(--slider-bg); overflow: hidden;
   }
   .slider-fill {
-    position: absolute; left: 0; top: 0; bottom: 0; width: 0;
+    position: absolute; left: 0; top: 0; bottom: 0; width: 10px;
     border-radius: 14px; background: var(--primary);
+    transition: width .25s cubic-bezier(.4,0,.2,1);
   }
   .slider-thumb {
-    position: absolute; top: 50%; left: 0; width: 20px; height: 20px; border-radius: 50%;
+    position: absolute; top: 50%; left: 10px; width: 20px; height: 20px; border-radius: 50%;
     background: #FFFFFF; box-shadow: 0 1px 4px rgba(0,0,0,.2);
     transform: translate(-50%, -50%);
-    transition: transform .18s cubic-bezier(.34,1.35,.64,1);
+    transition: left .25s cubic-bezier(.4,0,.2,1), transform .18s cubic-bezier(.34,1.35,.64,1);
     pointer-events: none;
   }
   .slider.active .slider-thumb { transform: translate(-50%, -50%) scale(1.127); }
+  .slider.active .slider-fill, .slider.active .slider-thumb { transition: none; }
 
   /* 卡片内说明文字 */
   .card-summary { font-size: 14px; color: var(--summary); padding: 6px 16px 16px; line-height: 1.45; }
@@ -231,7 +234,7 @@
 
   /* ===== 对话框（SuperDialog：居中卡片 24dp 圆角，标题左对齐，按钮并排） ===== */
   .dialog-mask {
-    position: fixed; inset: 0; background: var(--dim); z-index: 20;
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--dim); z-index: 20;
     display: flex; align-items: center; justify-content: center; padding: 32px;
     opacity: 0; transition: opacity .2s; pointer-events: none;
   }
@@ -485,22 +488,25 @@ async function toggleEnable() {
 
 // ---------- 灵敏度（miuix Slider） ----------
 const GAIN_MIN = 0.2, GAIN_MAX = 10;
-function gainToFrac(v) { return (v - GAIN_MIN) / (GAIN_MAX - GAIN_MIN); }
-function fracToGain(f) { return GAIN_MIN + f * (GAIN_MAX - GAIN_MIN); }
+const THUMB_R = 10; // 滑块半径：圆心限制在 [R, w-R]，任何位置都不被卡片裁切
+let gainCur = 1.0;
 function renderGain(v) {
-  const f = Math.max(0, Math.min(1, gainToFrac(v)));
-  document.getElementById('gainFill').style.width = (f * 100) + '%';
-  document.getElementById('gainThumb').style.left = (f * 100) + '%';
+  gainCur = v;
+  const el = document.getElementById('gainSlider');
+  const w = el.clientWidth || 1;
+  const f = Math.max(0, Math.min(1, (v - GAIN_MIN) / (GAIN_MAX - GAIN_MIN)));
+  const x = THUMB_R + f * (w - THUMB_R * 2);
+  document.getElementById('gainFill').style.width = x + 'px';
+  document.getElementById('gainThumb').style.left = x + 'px';
   document.getElementById('gain-v').textContent = v.toFixed(1) + '×';
 }
 function bindGainSlider() {
   const el = document.getElementById('gainSlider');
-  let cur = 1.0;
   const setFromEvent = (e) => {
     const rect = el.getBoundingClientRect();
-    const f = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    cur = Math.round(fracToGain(f) * 10) / 10;
-    renderGain(cur);
+    const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+    const f = Math.max(0, Math.min(1, (x - THUMB_R) / (rect.width - THUMB_R * 2)));
+    renderGain(GAIN_MIN + f * (GAIN_MAX - GAIN_MIN));
   };
   el.addEventListener('pointerdown', (e) => {
     el.setPointerCapture(e.pointerId);
@@ -513,12 +519,13 @@ function bindGainSlider() {
     el.classList.remove('active');
     setFromEvent(e);
     try {
-      await putSetting('motion_cues_gain', cur.toFixed(1));
-      toast('灵敏度已保存：' + cur.toFixed(1) + '×');
+      await putSetting('motion_cues_gain', gainCur.toFixed(1));
+      toast('灵敏度已保存：' + gainCur.toFixed(1) + '×');
     } catch (err) { toast('保存失败：' + err.message); }
   };
   el.addEventListener('pointerup', release);
   el.addEventListener('pointercancel', release);
+  window.addEventListener('resize', () => renderGain(gainCur));
 }
 async function loadGain() {
   const v = await getSetting('motion_cues_gain');
