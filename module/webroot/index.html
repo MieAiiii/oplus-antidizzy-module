@@ -163,7 +163,7 @@
     background: var(--slider-bg); overflow: hidden;
   }
   .slider-fill {
-    position: absolute; left: 0; top: 0; bottom: 0; width: 10px;
+    position: absolute; left: 0; top: 0; bottom: 0; width: 24px;
     border-radius: 14px; background: var(--primary);
     transition: width .25s cubic-bezier(.4,0,.2,1);
   }
@@ -489,6 +489,7 @@ async function toggleEnable() {
 // ---------- 灵敏度（miuix Slider） ----------
 const GAIN_MIN = 0.2, GAIN_MAX = 10;
 const THUMB_R = 10; // 滑块半径：圆心限制在 [R, w-R]，任何位置都不被卡片裁切
+const RAIL_R = 14;  // 填充条圆头半径 = 轨道半高（miuix StrokeCap.Round），包裹白色滑块露出 4px 蓝边
 let gainCur = 1.0;
 function renderGain(v) {
   gainCur = v;
@@ -496,7 +497,8 @@ function renderGain(v) {
   const w = el.clientWidth || 1;
   const f = Math.max(0, Math.min(1, (v - GAIN_MIN) / (GAIN_MAX - GAIN_MIN)));
   const x = THUMB_R + f * (w - THUMB_R * 2);
-  document.getElementById('gainFill').style.width = x + 'px';
+  // 填充条宽度 = 圆心 + 圆头半径：圆头圆心恰好与滑块同心，蓝色包裹白色滑块
+  document.getElementById('gainFill').style.width = (x + RAIL_R) + 'px';
   document.getElementById('gainThumb').style.left = x + 'px';
   document.getElementById('gain-v').textContent = v.toFixed(1) + '×';
 }
