@@ -303,7 +303,15 @@
     <div class="slider-track"><div class="slider-fill"></div></div>
     <div class="slider-thumb"></div>
   </div>
-  <div class="card-summary">转弯侧向和加减速前后由两个独立倍率控制：原厂算法对两轴一视同仁，但车辆加减速的物理信号天生比转弯弱好几倍，默认 2.5× 让前后观感与转弯接近。觉得刹车/起步时圆点不动就调大，方向晃过头就调小。松手即保存，约 2 秒生效，无需重启。</div>
+  <div class="mi-row">
+    <div class="row-title">静止门限</div>
+    <div class="row-value" id="gate-v">—</div>
+  </div>
+  <div class="slider" id="gateSlider">
+    <div class="slider-track"><div class="slider-fill"></div></div>
+    <div class="slider-thumb"></div>
+  </div>
+  <div class="card-summary">转弯侧向和加减速前后由两个独立倍率控制：原厂算法对两轴一视同仁，但车辆加减速的物理信号天生比转弯弱好几倍，默认 2.5× 让前后观感与转弯接近。觉得刹车/起步时圆点不动就调大，方向晃过头就调小。静止门限用于抑制竖拿手机时的重力漂移——圆点明明没开车却缓缓移动就调大它（默认 0.08，拖到最左关闭）。松手即保存，约 2 秒生效，无需重启。</div>
 </div>
 
 <div class="group-title">显示模式</div>
@@ -337,6 +345,13 @@
   <div class="mi-row pressable" onclick="setTest(1)">
     <div class="row-title">正弦摆动</div>
     <span class="radio" id="t1"></span>
+  </div>
+  <div class="mi-row pressable" onclick="setTest(5)">
+    <div class="row-main">
+      <div class="row-title">竖持漂移</div>
+      <div class="row-summary">模拟重力泄漏，圆点应纹丝不动</div>
+    </div>
+    <span class="radio" id="t5"></span>
   </div>
 </div>
 <div class="card" style="padding:12px 16px 14px; display:flex; gap:12px;">
@@ -552,6 +567,12 @@ const gainyS = makeSlider('gainySlider', {
   commit: (v) => putSetting('motion_cues_gain_y', v.toFixed(1)),
   doneMsg: (v) => '前后向增强已保存：' + v.toFixed(1) + '×',
 });
+const gateS = makeSlider('gateSlider', {
+  min: 0, max: 0.3, def: 0.08, label: 'gate-v',
+  fmt: (v) => v <= 0.004 ? '关闭' : v.toFixed(2),
+  commit: (v) => putSetting('motion_cues_gate', v <= 0.004 ? '0' : v.toFixed(2)),
+  doneMsg: (v) => v <= 0.004 ? '静止门限已关闭' : '静止门限已保存：' + v.toFixed(2),
+});
 
 async function loadGain() {
   const v = await getSetting('motion_cues_gain');
@@ -560,6 +581,9 @@ async function loadGain() {
   const vy = await getSetting('motion_cues_gain_y');
   const gy = vy && parseFloat(vy) > 0 ? parseFloat(vy) : 2.5;
   gainyS.render(gy);
+  const vg = await getSetting('motion_cues_gate');
+  const gv = (vg !== null && vg !== '' && !isNaN(parseFloat(vg))) ? Math.max(0, parseFloat(vg)) : 0.08;
+  gateS.render(gv);
 }
 
 // ---------- 模式 ----------
@@ -585,7 +609,7 @@ function syncRadios(prefix, val) {
 }
 async function loadTest() {
   const v = await getSetting('motion_cues_bridge_test');
-  const n = ['0', '1', '2'].includes(v) ? v : '0';
+  const n = ['0', '1', '2', '5'].includes(v) ? v : '0';
   syncRadios('t', n);
 }
 
@@ -615,6 +639,7 @@ async function saveVeh() {
 const DEFAULTS = {
   motion_cues_gain: 1.0,
   motion_cues_gain_y: 2.5,
+  motion_cues_gate: 0.08,
   motion_cues_veh_rms: 0.12,
   motion_cues_veh_low: 0.55,
   motion_cues_veh_rot: 0.12,

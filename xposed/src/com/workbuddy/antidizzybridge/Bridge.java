@@ -92,6 +92,9 @@ public class Bridge implements IXposedHookLoadPackage {
      *  天然比转弯侧向弱 2~5 倍，且短促信号被 ACCEL_FILTER=0.05 低通进一步衰减，
      *  所以纵向需要额外放大才能和转弯观感一致。 */
     private volatile float gainY = 2.5f;
+    /** 静止噪声门限：包络低于此值的轴清零，抑制竖持重力泄漏/手持缓晃导致的圆点漂移。0=关闭 */
+    private volatile float gate = 0.08f;
+    private float envX = 0f, envY = 0f;
     private volatile int mode = 2;
     private volatile int testMode = 0;
     private volatile boolean enabled = true;
@@ -421,6 +424,7 @@ public class Bridge implements IXposedHookLoadPackage {
                                 + " inst=" + (sInstances == null ? -1 : sInstances.size())
                                 + " a=(" + r(lastAx) + "," + r(lastAy) + "," + r(lastAz) + ")"
                                 + " gain=" + r(gain) + "/" + r(gainY)
+                                + " gate=" + r(gate)
                                 + " gyro=" + r(lastGyro)
                                 + " alpha=" + sAppliedAlpha);
                     } catch (Throwable ignored) {
@@ -461,6 +465,14 @@ public class Bridge implements IXposedHookLoadPackage {
                     "motion_cues_bridge_test", 0);
             gain = readFloat(c, "motion_cues_gain", 1.0f);
             gainY = readFloat(c, "motion_cues_gain_y", 2.5f);
+            // gate 允许 0（=关闭门控），readFloat 会把 0 当无效回退默认，单独读
+            try {
+                String gs = Settings.Secure.getString(c.getContentResolver(), "motion_cues_gate");
+                gate = (gs == null || gs.trim().isEmpty())
+                        ? 0.08f : Math.max(0f, Float.parseFloat(gs.trim()));
+            } catch (Throwable t) {
+                gate = 0.08f;
+            }
             vehRms = readFloat(c, "motion_cues_veh_rms", 0.10f);
             vehStop = readFloat(c, "motion_cues_veh_stop", 0.045f);
             vehHold = readFloat(c, "motion_cues_veh_hold", 5f);
@@ -524,6 +536,20 @@ public class Bridge implements IXposedHookLoadPackage {
         detector.setSampleRate(1f / Math.max(0.005f, dt));
         detector.onSample(ax, ay, az, gx, gy, gz, vx, vy, vz, dt);
 
+        // ---- 静止噪声门限（v7.1）----
+        // 竖持时重力在 X/Y 投影大，LINEAR_ACCELERATION 在缓慢倾斜时会泄漏毫级伪加速度，
+        // 加上手持缓晃，这些 0.05~0.1 的信号会被前置增益放大后越过原厂 0.196 死区，
+        // 表现为「明明没动，圆点却因重力漂移」。
+        // 用快包络（τ≈0.1s）跟踪每轴幅度，持续低于门限的轴直接清零：
+        // 手持漂移被杀，车内转弯/加减速（大信号，包络瞬间越过门限）几乎无损。
+        // gate <= 0 时关闭门控。
+        if (gate > 0f) {
+            envX += (Math.abs(ax) - envX) * 0.10f;
+            envY += (Math.abs(ay) - envY) * 0.10f;
+            if (envX < gate) ax = 0f;
+            if (envY < gate) ay = 0f;
+        }
+
         if (Math.abs(ax) < 0.02f) ax = 0f;
         if (Math.abs(ay) < 0.02f) ay = 0f;
         if (Math.abs(az) < 0.02f) az = 0f;
@@ -562,6 +588,13 @@ public class Bridge implements IXposedHookLoadPackage {
                     + 0.10f * (float) (Math.random() - 0.5);
             float g = (float) (0.26 + 0.12 * Math.sin(2 * Math.PI * 0.35 * t));
             return new float[]{hf * 0.8f, hf, hf * 0.6f, g, g * 0.7f, g * 0.5f};
+        }
+        if (m == 5) {
+            // 竖持漂移：重力缓慢泄漏 + 手持缓晃（幅度低于门限，应被 gate 清零、圆点不动）
+            float leak = 0.07f * (float) Math.sin(2 * Math.PI * 0.09 * t)
+                    + 0.015f * (float) (Math.random() - 0.5);
+            float sway = 0.05f * (float) Math.sin(2 * Math.PI * 0.25 * t + 1.0);
+            return new float[]{sway, leak + sway, 0f, 0.05f, 0.04f, 0.03f};
         }
         // 正弦振荡：仅用于确认原生渲染链路是否打通
         float a = (float) (3.0 * Math.sin(2 * Math.PI * 0.4 * t));
