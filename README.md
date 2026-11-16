@@ -39,7 +39,7 @@ ColorOS 16 的「晕动舒缓显示」（设置 → 辅助功能）会在屏幕�
 
 ## 安装
 
-1. KernelSU → 模块 → 从本地安装 → `dist/oplus-antidizzy-module-v5.0.zip` → 重启
+1. 从 [Releases](https://github.com/yibgt/oplus-antidizzy-module/releases) 下载最新的 zip，在 KernelSU 中安装 → 重启
 2. 打开 **LSPosed** → 模块 → 勾选 **AntiDizzy Bridge** → 作用域只勾 **系统框架** → 重启
 3. 设置 → 辅助功能 → 晕动舒缓显示 → 开启
 
@@ -84,7 +84,7 @@ xposed/            LSPosed 模块源码
   stub/              Xposed API 编译期桩（不进 dex，运行时由 LSPosed 提供）
   assets/xposed_init 入口声明
 build/             构建脚本
-dist/              预编译产物
+dist/             本地构建输出（不入库，从 Releases 下载）
 docs/              技术文档、论坛文案、截图
 tools/dalvik.py    DEX 反汇编工具（逆向时用）
 ```

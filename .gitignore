@@ -28,3 +28,7 @@ x9_img/
 
 # 日志
 *.log
+
+# 构建产物不入库，从 Release 下载（CI 自动发布）
+dist/*.zip
+dist/*.apk
