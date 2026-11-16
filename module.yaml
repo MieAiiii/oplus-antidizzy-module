@@ -1,0 +1,7 @@
+# KernelSU Modules 收录元数据（modules.kernelsu.org）
+# 字段说明见 https://developers.kernelsu.org/docs/module-yaml
+schemaVersion: 1
+id: motion_cues_port
+name: 晕动舒缓显示（欧加通用）
+summary: 为缺少「晕动舒缓显示」的 OPPO/一加/realme ColorOS 16 机型补全原生防晕动圆点，驱动原厂渲染，免改分区
+description: README.md
