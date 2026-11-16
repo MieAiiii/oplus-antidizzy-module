@@ -6,7 +6,7 @@ get() { v=$(settings --user 0 get secure "$1" 2>/dev/null); [ -z "$v" ] || [ "$v
 
 GAIN=$(get motion_cues_gain 1.0)
 MODE=$(get oplus_customize_antidizzy_mode 2)
-ENABLE=$(get oplus_customize_antidizzy_enable 1)
+ENABLE=$(get oplus_customize_antidizzy_enable 0)
 TEST=$(get motion_cues_bridge_test 0)
 
 VRMS=$(get motion_cues_veh_rms 0.12)
