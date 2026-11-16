@@ -1,9 +1,6 @@
 package com.workbuddy.antidizzybridge;
 
-import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -82,25 +79,6 @@ public class Bridge implements IXposedHookLoadPackage {
 
     private final VehicleDetector detector = new VehicleDetector();
 
-    // ---- 导航广播监听 ----
-    // 场景服务识别「驾车」靠的是地图导航 App 发出的状态广播。
-    // system_server 里注册 receiver 可以直接收到同样的广播——这是当前唯一
-    // 能拿到的可靠驾车信号（sensorhub 模块缺失、场景库被 SELinux 拦）。
-    // 先全量 dump extras 摸清格式，之后再解析 status。
-    private static final String[] NAV_ACTIONS = {
-            "com.autonavi.minimap#Navigation.NotifyDrivingNavigationStatus",      // 高德驾车
-            "com.autonavi.minimap#Navigation.NotifyPublicTransportStatus",        // 高德公交/地铁
-            "com.autonavi.minimap#Navigation.NotifyGaoDeTaxiStatus",              // 高德打车
-            "com.autonavi.minimap#Navigation.NotifyCruiseTrafficLightStatus",     // 高德巡航
-            "com.tencent.map#Navigation.NotifyDrivingNavigationStatus",           // 腾讯驾车
-            "com.tencent.map#Navigation.NotifyCruiseTrafficLightStatus",          // 腾讯巡航
-            "com.baidu.BaiduMap#Navigation.NotifyDrivingNavigationStatus",        // 百度
-            "com.baidu.navi#Navigation.NotifyDrivingNavigationStatus",            // 百度导航
-    };
-    private volatile BroadcastReceiver navReceiver;
-    private volatile int navRxCount = 0;
-    /** 从导航广播解析出的「驾车中」状态（真实格式待实测校准） */
-    private volatile boolean navDriving = false;
     private final float[] gravity = new float[3];
     private boolean gravityInit;
     private long lastSampleNs = 0L;
@@ -178,7 +156,6 @@ public class Bridge implements IXposedHookLoadPackage {
         startRefresher();
         startReporter();
         registerSensors();
-        registerNavReceiver();
 
         log("ready: source=" + (sUseLinear ? "LINEAR_ACCELERATION" : "ACCELEROMETER")
                 + " gyro=" + (sGyro != null));
@@ -440,7 +417,6 @@ public class Bridge implements IXposedHookLoadPackage {
                                 + " inst=" + (sInstances == null ? -1 : sInstances.size())
                                 + " a=(" + r(lastAx) + "," + r(lastAy) + "," + r(lastAz) + ")"
                                 + " gyro=" + r(lastGyro)
-                                + " nav=" + navDriving + "/rx" + navRxCount
                                 + " alpha=" + sAppliedAlpha);
                     } catch (Throwable ignored) {
                     }
@@ -490,63 +466,6 @@ public class Bridge implements IXposedHookLoadPackage {
             detector.stepReject = readFloat(c, "motion_cues_veh_step", 0.45f);
         } catch (Throwable ignored) {
         }
-    }
-
-    /** 注册导航广播监听：广播本身是公开的，system_server 也能收。 */
-    private void registerNavReceiver() {
-        try {
-            IntentFilter f = new IntentFilter();
-            for (String a : NAV_ACTIONS) f.addAction(a);
-            // 千万不要 addDataType：带 type 的 filter 只匹配有 MIME 的 intent，
-            // 导航广播没有 type，加了就永远收不到（本次排查花了一轮部署才定位）
-            navReceiver = new BroadcastReceiver() {
-                @Override
-                public void onReceive(Context context, Intent intent) {
-                    try {
-                        navRxCount++;
-                        StringBuilder sb = new StringBuilder(intent.getAction());
-                        String pkg = intent.getPackage();
-                        if (pkg != null) sb.append(" pkg=").append(pkg);
-                        android.os.Bundle ex = intent.getExtras();
-                        if (ex != null) {
-                            sb.append(" extras={");
-                            for (String k : ex.keySet()) {
-                                sb.append(k).append('=').append(ex.get(k)).append(", ");
-                            }
-                            sb.append('}');
-                        }
-                        log("nav rx: " + sb);
-                        boolean d = guessDriving(intent);
-                        if (d != navDriving) {
-                            navDriving = d;
-                            log("nav driving -> " + d);
-                        }
-                    } catch (Throwable ignored) {}
-                }
-            };
-            sCtx.registerReceiver(navReceiver, f);
-            log("nav receiver registered (" + NAV_ACTIONS.length + " actions)");
-        } catch (Throwable t) {
-            log("nav receiver failed: " + t);
-        }
-    }
-
-    /**
-     * 启发式解析导航广播里的「驾车中」状态。
-     * 真实格式以日志 dump 为准，这里先覆盖常见的 key 约定。
-     */
-    private boolean guessDriving(Intent intent) {
-        android.os.Bundle ex = intent.getExtras();
-        if (ex == null) return navDriving;
-        for (String k : new String[]{"status", "navigation_status", "NavigationStatus"}) {
-            Object v = ex.get(k);
-            if (v instanceof Integer) return (Integer) v == 1;
-        }
-        for (String k : new String[]{"isNavigation", "isNavigating", "isDriving"}) {
-            Object v = ex.get(k);
-            if (v instanceof Boolean) return (Boolean) v;
-        }
-        return navDriving;
     }
 
     private static float readFloat(Context c, String key, float def) {
