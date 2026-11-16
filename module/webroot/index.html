@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>晕动舒缓 · 控制面板</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f4f5f7; --card: #ffffff; --text: #1c1c1e; --sub: #6e6e73;
+    --accent: #3478f6; --line: #e3e5ea; --ok: #34c759; --warn: #ff9500;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101014; --card: #1c1c22; --text: #e8e8ec; --sub: #9a9aa2;
+      --accent: #4d8dff; --line: #2a2a32; --ok: #30d158; --warn: #ffd60a;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0 auto; max-width: 560px; padding: 16px 16px 40px;
+    background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, "HarmonyOS Sans SC", "MiSans", "Noto Sans CJK SC", sans-serif;
+  }
+  h1 { font-size: 19px; margin: 4px 2px 2px; }
+  .sub { color: var(--sub); font-size: 12.5px; margin: 0 2px 14px; }
+  .card {
+    background: var(--card); border-radius: 14px; padding: 14px 16px;
+    margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  .row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; }
+  .row + .row { border-top: 1px solid var(--line); }
+  .label { font-size: 14.5px; }
+  .hint { color: var(--sub); font-size: 12px; margin-top: 2px; }
+  .value { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 15px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--sub); }
+  .dot.on { background: var(--ok); }
+  .dot.off { background: var(--warn); }
+  input[type=range] { width: 100%; height: 34px; accent-color: var(--accent); margin: 4px 0 0; }
+  select, input[type=number], input[type=text] {
+    background: var(--bg); color: var(--text); border: 1px solid var(--line);
+    border-radius: 9px; padding: 7px 10px; font-size: 14px; max-width: 150px;
+  }
+  button {
+    background: var(--accent); color: #fff; border: 0; border-radius: 10px;
+    padding: 10px 16px; font-size: 14.5px; font-weight: 600; width: 100%; margin-top: 4px;
+  }
+  button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  button.sm { width: auto; padding: 6px 14px; font-size: 13px; }
+  .toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
+    background: rgba(28,28,30,.92); color: #fff; padding: 9px 18px; border-radius: 20px;
+    font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 9;
+  }
+  .toast.show { opacity: 1; }
+  details summary { cursor: pointer; font-weight: 600; font-size: 14.5px; padding: 4px 0; }
+  #status { font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--sub); white-space: pre-wrap; margin-top: 8px; }
+  .seg { display: flex; gap: 8px; }
+  .seg button { flex: 1; margin: 0; }
+  .seg button.sel { outline: 2px solid var(--accent); }
+</style>
+</head>
+<body>
+  <h1>晕动舒缓显示</h1>
+  <p class="sub">欧加通用模块 · 控制面板</p>
+
+  <div class="card">
+    <div class="row">
+      <div class="label"><span class="dot" id="dot-veh"></span>车辆识别</div>
+      <div class="value" id="veh-state">—</div>
+    </div>
+    <div class="row">
+      <div class="label">当前模式</div>
+      <div class="value" id="mode-state">—</div>
+    </div>
+    <div id="status">正在读取状态…</div>
+    <button class="ghost" onclick="refreshState()">刷新状态</button>
+  </div>
+
+  <div class="card">
+    <div class="row"><div class="label">圆点灵敏度</div><div class="value" id="gain-v">—</div></div>
+    <input type="range" id="gain" min="0.2" max="10" step="0.1" value="1">
+    <div class="hint">车晃时圆点滑动的幅度倍数。觉得动得慢就调大，一般 1.5 ~ 3 之间比较明显。保存后约 2 秒生效，无需重启。</div>
+    <button onclick="saveGain()">保存灵敏度</button>
+  </div>
+
+  <div class="card">
+    <div class="label" style="padding-bottom:8px">显示模式</div>
+    <div class="seg">
+      <button id="m2" onclick="setMode(2)">常驻显示</button>
+      <button id="m1" onclick="setMode(1)">仅车辆运动</button>
+    </div>
+    <div class="hint">「仅车辆运动」由加速度计识别：车持续动 8 秒后出现，停车 5 秒后消失。</div>
+  </div>
+
+  <details class="card">
+    <summary>车辆识别参数（进阶）</summary>
+    <div class="row"><div class="label">振动能量下限<div class="hint">motion_cues_veh_rms</div></div><input type="number" id="veh_rms" step="0.01"></div>
+    <div class="row"><div class="label">低频占比下限<div class="hint">motion_cues_veh_low，调大更抗手抖</div></div><input type="number" id="veh_low" step="0.05"></div>
+    <div class="row"><div class="label">陀螺上限<div class="hint">motion_cues_veh_rot，调小更严格</div></div><input type="number" id="veh_rot" step="0.01"></div>
+    <div class="row"><div class="label">步态拒绝阈值<div class="hint">motion_cues_veh_step</div></div><input type="number" id="veh_step" step="0.05"></div>
+    <div class="row"><div class="label">进入判定秒数<div class="hint">motion_cues_veh_hold</div></div><input type="number" id="veh_hold" step="1"></div>
+    <button onclick="saveVeh()">保存车辆参数</button>
+  </details>
+
+  <details class="card">
+    <summary>测试（模拟车辆振动）</summary>
+    <div class="seg">
+      <button onclick="setTest(0)">关闭</button>
+      <button onclick="setTest(2)">模拟车辆</button>
+      <button onclick="setTest(1)">正弦摆动</button>
+    </div>
+    <div class="hint">不开车也能看效果：选「模拟车辆」后几秒内圆点应出现（仅车辆模式下）。测完记得关闭。</div>
+    <button class="ghost sm" onclick="setTest(3)">模拟走路（应拒绝）</button>
+    <button class="ghost sm" onclick="setTest(4)">手持微动（应拒绝）</button>
+  </details>
+
+  <div class="card">
+    <div class="hint" style="margin:0">
+      参数保存在系统 Settings.Secure，卸载模块会被自动清理。改动由注入服务实时读取。
+      <br>手机当前静止时加速度计读数接近 0，属正常现象。
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+// ---------- KernelSU 桥接（兼容官方/Next 两种注入方式） ----------
+function bridge() {
+  if (window.ksu && typeof window.ksu.exec === 'function') return window.ksu;
+  if (window.kernelsu && typeof window.kernelsu.exec === 'function') return window.kernelsu;
+  return null;
+}
+async function exec(cmd) {
+  const k = bridge();
+  if (!k) throw new Error('未检测到 KernelSU 环境，请在管理器内打开本页面');
+  const r = await k.exec(cmd);
+  if (r && typeof r.stdout === 'string') return r;
+  return { errno: 0, stdout: String(r || ''), stderr: '' };
+}
+async function getSetting(key) {
+  try {
+    const r = await exec(`settings get secure ${key}`);
+    return (r.stdout || '').trim();
+  } catch (e) { return null; }
+}
+async function putSetting(key, val) {
+  await exec(`settings put secure ${key} ${val}`);
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+// ---------- 状态 ----------
+let lastRaw = '';
+async function refreshState() {
+  try {
+    const r = await exec(
+      "su -c 'grep -h \"state:\" /data/adb/lspd/log/modules_*.log 2>/dev/null | tail -1'");
+    const line = (r.stdout || '').trim();
+    if (!line) { document.getElementById('status').textContent = '暂无运行日志'; return; }
+    const m = line.replace(/^.*AntiDizzyBridge:\s*/, '');
+    if (m === lastRaw) return;
+    lastRaw = m;
+    document.getElementById('status').textContent = m;
+
+    const veh = /veh=true/.test(m);
+    const modeM = m.match(/mode=(\d)/);
+    const mode = modeM ? modeM[1] : '?';
+    document.getElementById('veh-state').textContent = veh ? '在车上' : '未检测到车辆';
+    document.getElementById('dot-veh').className = 'dot ' + (veh ? 'on' : 'off');
+    document.getElementById('mode-state').textContent = mode === '2' ? '常驻显示' : mode === '1' ? '仅车辆运动' : mode;
+    document.getElementById('m1').classList.toggle('sel', mode === '1');
+    document.getElementById('m2').classList.toggle('sel', mode === '2');
+  } catch (e) {
+    document.getElementById('status').textContent = '读取失败: ' + e.message;
+  }
+}
+
+// ---------- 灵敏度 ----------
+async function loadGain() {
+  const v = await getSetting('motion_cues_gain');
+  const g = v && parseFloat(v) > 0 ? parseFloat(v) : 1.0;
+  document.getElementById('gain').value = g;
+  document.getElementById('gain-v').textContent = g.toFixed(1) + '×';
+}
+function bindGain() {
+  const el = document.getElementById('gain');
+  el.addEventListener('input', () => {
+    document.getElementById('gain-v').textContent = parseFloat(el.value).toFixed(1) + '×';
+  });
+  el.addEventListener('change', () => saveGain(true));
+}
+async function saveGain(silent) {
+  const v = parseFloat(document.getElementById('gain').value).toFixed(1);
+  await putSetting('motion_cues_gain', v);
+  if (!silent) toast('灵敏度已保存：' + v + '×');
+}
+
+// ---------- 模式 ----------
+async function setMode(m) {
+  await putSetting('oplus_customize_antidizzy_mode', m);
+  toast(m === 2 ? '已切换：常驻显示' : '已切换：仅车辆运动');
+  refreshState();
+}
+
+// ---------- 测试 ----------
+async function setTest(v) {
+  await putSetting('motion_cues_bridge_test', v);
+  toast(v === 0 ? '测试已关闭' : '测试模式 ' + v + ' 已开启');
+}
+
+// ---------- 车辆参数 ----------
+const VEH_KEYS = ['motion_cues_veh_rms', 'motion_cues_veh_low', 'motion_cues_veh_rot',
+                  'motion_cues_veh_step', 'motion_cues_veh_hold'];
+async function loadVeh() {
+  const defs = { motion_cues_veh_rms: 0.12, motion_cues_veh_low: 0.55,
+                 motion_cues_veh_rot: 0.12, motion_cues_veh_step: 0.45,
+                 motion_cues_veh_hold: 8 };
+  for (const k of VEH_KEYS) {
+    const v = await getSetting(k);
+    const el = document.getElementById(k.replace('motion_cues_', ''));
+    if (el) el.value = (v && parseFloat(v) > 0) ? parseFloat(v) : defs[k];
+  }
+}
+async function saveVeh() {
+  for (const k of VEH_KEYS) {
+    const el = document.getElementById(k.replace('motion_cues_', ''));
+    const v = parseFloat(el.value);
+    if (!isNaN(v) && v > 0) await putSetting(k, v);
+  }
+  toast('车辆参数已保存，约 2 秒生效');
+}
+
+// ---------- 初始化 ----------
+(async () => {
+  if (!bridge()) {
+    document.getElementById('status').textContent =
+      '未检测到 KernelSU 环境。请在 KernelSU 管理器 → 模块 → 晕动舒缓显示 → WebUI 打开本页面。';
+    document.querySelectorAll('button, input, select, summary').forEach(el => el.disabled = true);
+    return;
+  }
+  bindGain();
+  await Promise.all([loadGain(), loadVeh(), refreshState()]);
+  setInterval(refreshState, 3000);
+})();
+</script>
+</body>
+</html>
