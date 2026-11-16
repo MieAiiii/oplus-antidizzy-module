@@ -44,6 +44,7 @@ for k in oplus_customize_antidizzy_enable \
          oplus_customize_antidizzy_mode \
          oplus_customize_antidizzy_force_off \
          motion_cues_gain \
+         motion_cues_gain_y \
          motion_cues_bridge_test \
          motion_cues_veh_rms \
          motion_cues_veh_stop \

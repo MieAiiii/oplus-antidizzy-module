@@ -88,6 +88,10 @@ public class Bridge implements IXposedHookLoadPackage {
     private static volatile Sensor sGrav;
 
     private volatile float gain = 1.0f;
+    /** 纵向（前后/加减速）独立增益：原厂算法 X/Y 对称，但车辆加减速的物理信号
+     *  天然比转弯侧向弱 2~5 倍，且短促信号被 ACCEL_FILTER=0.05 低通进一步衰减，
+     *  所以纵向需要额外放大才能和转弯观感一致。 */
+    private volatile float gainY = 2.5f;
     private volatile int mode = 2;
     private volatile int testMode = 0;
     private volatile boolean enabled = true;
@@ -416,6 +420,7 @@ public class Bridge implements IXposedHookLoadPackage {
                                 + " mode=" + mode + " test=" + testMode
                                 + " inst=" + (sInstances == null ? -1 : sInstances.size())
                                 + " a=(" + r(lastAx) + "," + r(lastAy) + "," + r(lastAz) + ")"
+                                + " gain=" + r(gain) + "/" + r(gainY)
                                 + " gyro=" + r(lastGyro)
                                 + " alpha=" + sAppliedAlpha);
                     } catch (Throwable ignored) {
@@ -455,6 +460,7 @@ public class Bridge implements IXposedHookLoadPackage {
             testMode = Settings.Secure.getInt(c.getContentResolver(),
                     "motion_cues_bridge_test", 0);
             gain = readFloat(c, "motion_cues_gain", 1.0f);
+            gainY = readFloat(c, "motion_cues_gain_y", 2.5f);
             vehRms = readFloat(c, "motion_cues_veh_rms", 0.10f);
             vehStop = readFloat(c, "motion_cues_veh_stop", 0.045f);
             vehHold = readFloat(c, "motion_cues_veh_hold", 5f);
@@ -522,7 +528,7 @@ public class Bridge implements IXposedHookLoadPackage {
         if (Math.abs(ay) < 0.02f) ay = 0f;
         if (Math.abs(az) < 0.02f) az = 0f;
 
-        ax *= gain; ay *= gain; az *= gain;
+        ax *= gain; ay *= gain * gainY; az *= gain;
 
         dispatch(ax, ay, az);
     }

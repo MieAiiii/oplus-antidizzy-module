@@ -288,14 +288,22 @@
 <div class="group-title">灵敏度</div>
 <div class="card">
   <div class="mi-row">
-    <div class="row-title">圆点摆动幅度</div>
+    <div class="row-title">摆动幅度</div>
     <div class="row-value" id="gain-v">—</div>
   </div>
   <div class="slider" id="gainSlider">
     <div class="slider-track"><div class="slider-fill" id="gainFill"></div></div>
     <div class="slider-thumb" id="gainThumb"></div>
   </div>
-  <div class="card-summary">车晃时圆点滑动的幅度倍数。觉得动得慢就调大，一般 1.5 ~ 3 之间比较明显。松手即保存，约 2 秒生效，无需重启。</div>
+  <div class="mi-row">
+    <div class="row-title">前后向增强</div>
+    <div class="row-value" id="gainy-v">—</div>
+  </div>
+  <div class="slider" id="gainySlider">
+    <div class="slider-track"><div class="slider-fill"></div></div>
+    <div class="slider-thumb"></div>
+  </div>
+  <div class="card-summary">转弯侧向和加减速前后由两个独立倍率控制：原厂算法对两轴一视同仁，但车辆加减速的物理信号天生比转弯弱好几倍，默认 2.5× 让前后观感与转弯接近。觉得刹车/起步时圆点不动就调大，方向晃过头就调小。松手即保存，约 2 秒生效，无需重启。</div>
 </div>
 
 <div class="group-title">显示模式</div>
@@ -486,29 +494,30 @@ async function toggleEnable() {
   }
 }
 
-// ---------- 灵敏度（miuix Slider） ----------
-const GAIN_MIN = 0.2, GAIN_MAX = 10;
+// ---------- 灵敏度（miuix Slider，可复用多实例） ----------
 const THUMB_R = 10; // 滑块半径：圆心限制在 [R, w-R]，任何位置都不被卡片裁切
 const RAIL_R = 14;  // 填充条圆头半径 = 轨道半高（miuix StrokeCap.Round），包裹白色滑块露出 4px 蓝边
-let gainCur = 1.0;
-function renderGain(v) {
-  gainCur = v;
-  const el = document.getElementById('gainSlider');
-  const w = el.clientWidth || 1;
-  const f = Math.max(0, Math.min(1, (v - GAIN_MIN) / (GAIN_MAX - GAIN_MIN)));
-  const x = THUMB_R + f * (w - THUMB_R * 2);
-  // 填充条宽度 = 圆心 + 圆头半径：圆头圆心恰好与滑块同心，蓝色包裹白色滑块
-  document.getElementById('gainFill').style.width = (x + RAIL_R) + 'px';
-  document.getElementById('gainThumb').style.left = x + 'px';
-  document.getElementById('gain-v').textContent = v.toFixed(1) + '×';
-}
-function bindGainSlider() {
-  const el = document.getElementById('gainSlider');
+
+function makeSlider(id, opts) {
+  const el = document.getElementById(id);
+  const fill = el.querySelector('.slider-fill');
+  const thumb = el.querySelector('.slider-thumb');
+  let cur = opts.def;
+  function render(v) {
+    cur = v;
+    const w = el.clientWidth || 1;
+    const f = Math.max(0, Math.min(1, (v - opts.min) / (opts.max - opts.min)));
+    const x = THUMB_R + f * (w - THUMB_R * 2);
+    // 填充条宽度 = 圆心 + 圆头半径：圆头圆心恰好与滑块同心，蓝色包裹白色滑块
+    fill.style.width = (x + RAIL_R) + 'px';
+    thumb.style.left = x + 'px';
+    if (opts.label) document.getElementById(opts.label).textContent = opts.fmt(v);
+  }
   const setFromEvent = (e) => {
     const rect = el.getBoundingClientRect();
     const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
     const f = Math.max(0, Math.min(1, (x - THUMB_R) / (rect.width - THUMB_R * 2)));
-    renderGain(GAIN_MIN + f * (GAIN_MAX - GAIN_MIN));
+    render(opts.min + f * (opts.max - opts.min));
   };
   el.addEventListener('pointerdown', (e) => {
     el.setPointerCapture(e.pointerId);
@@ -521,18 +530,36 @@ function bindGainSlider() {
     el.classList.remove('active');
     setFromEvent(e);
     try {
-      await putSetting('motion_cues_gain', gainCur.toFixed(1));
-      toast('灵敏度已保存：' + gainCur.toFixed(1) + '×');
+      await opts.commit(cur);
+      toast(opts.doneMsg(cur));
     } catch (err) { toast('保存失败：' + err.message); }
   };
   el.addEventListener('pointerup', release);
   el.addEventListener('pointercancel', release);
-  window.addEventListener('resize', () => renderGain(gainCur));
+  window.addEventListener('resize', () => render(cur));
+  return { render, get: () => cur };
 }
+
+const gainS = makeSlider('gainSlider', {
+  min: 0.2, max: 10, def: 1.0, label: 'gain-v',
+  fmt: (v) => v.toFixed(1) + '×',
+  commit: (v) => putSetting('motion_cues_gain', v.toFixed(1)),
+  doneMsg: (v) => '摆动幅度已保存：' + v.toFixed(1) + '×',
+});
+const gainyS = makeSlider('gainySlider', {
+  min: 0.5, max: 10, def: 2.5, label: 'gainy-v',
+  fmt: (v) => v.toFixed(1) + '×',
+  commit: (v) => putSetting('motion_cues_gain_y', v.toFixed(1)),
+  doneMsg: (v) => '前后向增强已保存：' + v.toFixed(1) + '×',
+});
+
 async function loadGain() {
   const v = await getSetting('motion_cues_gain');
   const g = v && parseFloat(v) > 0 ? parseFloat(v) : 1.0;
-  renderGain(g);
+  gainS.render(g);
+  const vy = await getSetting('motion_cues_gain_y');
+  const gy = vy && parseFloat(vy) > 0 ? parseFloat(vy) : 2.5;
+  gainyS.render(gy);
 }
 
 // ---------- 模式 ----------
@@ -587,6 +614,7 @@ async function saveVeh() {
 // ---------- 恢复默认（SuperDialog） ----------
 const DEFAULTS = {
   motion_cues_gain: 1.0,
+  motion_cues_gain_y: 2.5,
   motion_cues_veh_rms: 0.12,
   motion_cues_veh_low: 0.55,
   motion_cues_veh_rot: 0.12,
@@ -608,7 +636,6 @@ async function doReset() {
 
 // ---------- 初始化 ----------
 (async () => {
-  bindGainSlider();
   if (!bridge()) {
     document.getElementById('status').textContent =
       '未检测到 KernelSU 环境。请在 KernelSU 管理器 → 模块 → 晕动舒缓显示 → WebUI 打开本页面。';
