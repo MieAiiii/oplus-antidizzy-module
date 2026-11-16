@@ -7,63 +7,91 @@
 <style>
   :root {
     color-scheme: light dark;
-    --bg: #f4f5f7; --card: #ffffff; --text: #1c1c1e; --sub: #6e6e73;
-    --accent: #3478f6; --line: #e3e5ea; --ok: #34c759; --warn: #ff9500;
+    --bg: #f3f3f5;
+    --card: #ffffff;
+    --text: #16171a;
+    --sub: #86868b;
+    --accent: #0d84ff;
+    --accent-soft: rgba(13,132,255,.10);
+    --line: rgba(0,0,0,.055);
+    --seg-bg: rgba(0,0,0,.05);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #101014; --card: #1c1c22; --text: #e8e8ec; --sub: #9a9aa2;
-      --accent: #4d8dff; --line: #2a2a32; --ok: #30d158; --warn: #ffd60a;
+      --bg: #0b0b0d;
+      --card: #1c1c1f;
+      --text: #f2f2f5;
+      --sub: #93939a;
+      --accent: #0a84ff;
+      --accent-soft: rgba(10,132,255,.16);
+      --line: rgba(255,255,255,.06);
+      --seg-bg: rgba(255,255,255,.06);
     }
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
-    margin: 0 auto; max-width: 560px; padding: 16px 16px 40px;
+    margin: 0 auto; max-width: 560px; padding: 0 14px 44px;
     background: var(--bg); color: var(--text);
-    font: 15px/1.5 -apple-system, "HarmonyOS Sans SC", "MiSans", "Noto Sans CJK SC", sans-serif;
+    font: 15px/1.5 MiSans, "MiSans VF", -apple-system, "HarmonyOS Sans SC",
+          "Noto Sans CJK SC", "Segoe UI", sans-serif;
   }
-  h1 { font-size: 19px; margin: 4px 2px 2px; }
-  .sub { color: var(--sub); font-size: 12.5px; margin: 0 2px 14px; }
+  .page-title {
+    font-size: 30px; font-weight: 700; letter-spacing: .3px;
+    margin: 26px 6px 20px;
+  }
+  .group-title {
+    font-size: 13px; color: var(--sub); font-weight: 500;
+    margin: 20px 14px 8px;
+  }
   .card {
-    background: var(--card); border-radius: 14px; padding: 14px 16px;
-    margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    background: var(--card); border-radius: 24px;
+    padding: 2px 18px; margin-bottom: 6px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
   }
-  .row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; }
+  .row { display: flex; align-items: center; justify-content: space-between; padding: 13px 0; }
   .row + .row { border-top: 1px solid var(--line); }
-  .label { font-size: 14.5px; }
-  .hint { color: var(--sub); font-size: 12px; margin-top: 2px; }
+  .label { font-size: 15px; font-weight: 500; }
+  .hint { color: var(--sub); font-size: 12px; font-weight: 400; margin-top: 3px; line-height: 1.45; }
   .value { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 15px; }
-  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--sub); }
-  .dot.on { background: var(--ok); }
-  .dot.off { background: var(--warn); }
-  input[type=range] { width: 100%; height: 34px; accent-color: var(--accent); margin: 4px 0 0; }
-  select, input[type=number], input[type=text] {
-    background: var(--bg); color: var(--text); border: 1px solid var(--line);
-    border-radius: 9px; padding: 7px 10px; font-size: 14px; max-width: 150px;
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; background: var(--sub); }
+  .dot.on { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .dot.off { background: var(--sub); }
+  input[type=range] { width: 100%; height: 36px; accent-color: var(--accent); margin: 2px 0 4px; }
+  input[type=number], input[type=text] {
+    background: var(--seg-bg); color: var(--text); border: none;
+    border-radius: 12px; padding: 9px 12px; font-size: 14px; max-width: 140px;
+    text-align: right; font-variant-numeric: tabular-nums;
   }
+  input[type=number]:focus, input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   button {
-    background: var(--accent); color: #fff; border: 0; border-radius: 10px;
-    padding: 10px 16px; font-size: 14.5px; font-weight: 600; width: 100%; margin-top: 4px;
+    background: var(--accent); color: #fff; border: 0; border-radius: 15px;
+    padding: 11px 16px; font-size: 15px; font-weight: 600; width: 100%; margin: 6px 0 8px;
+    font-family: inherit; transition: filter .15s;
   }
-  button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
-  button.sm { width: auto; padding: 6px 14px; font-size: 13px; }
+  button:active { filter: brightness(.85); }
+  button.ghost { background: var(--accent-soft); color: var(--accent); }
+  button.sm { width: auto; padding: 8px 16px; font-size: 13.5px; margin: 2px 4px 2px 0; }
+  .seg { display: flex; gap: 8px; padding: 6px 0 10px; }
+  .seg button { flex: 1; margin: 0; background: var(--seg-bg); color: var(--text); border-radius: 14px; }
+  .seg button.sel { background: var(--accent); color: #fff; }
+  #status {
+    font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--sub);
+    white-space: pre-wrap; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line);
+  }
+  .footer-hint { color: var(--sub); font-size: 12px; margin: 18px 16px 0; line-height: 1.6; }
   .toast {
-    position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
-    background: rgba(28,28,30,.92); color: #fff; padding: 9px 18px; border-radius: 20px;
+    position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%);
+    background: rgba(28,28,30,.94); color: #fff; padding: 10px 22px; border-radius: 22px;
     font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 9;
+    box-shadow: 0 4px 16px rgba(0,0,0,.2);
   }
   .toast.show { opacity: 1; }
-  details summary { cursor: pointer; font-weight: 600; font-size: 14.5px; padding: 4px 0; }
-  #status { font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--sub); white-space: pre-wrap; margin-top: 8px; }
-  .seg { display: flex; gap: 8px; }
-  .seg button { flex: 1; margin: 0; }
-  .seg button.sel { outline: 2px solid var(--accent); }
 </style>
 </head>
 <body>
-  <h1>晕动舒缓显示</h1>
-  <p class="sub">欧加通用模块 · 控制面板</p>
+  <div class="page-title">晕动舒缓显示</div>
 
+  <div class="group-title">运行状态</div>
   <div class="card">
     <div class="row">
       <div class="label"><span class="dot" id="dot-veh"></span>车辆识别</div>
@@ -77,24 +105,26 @@
     <button class="ghost" onclick="refreshState()">刷新状态</button>
   </div>
 
+  <div class="group-title">灵敏度</div>
   <div class="card">
-    <div class="row"><div class="label">圆点灵敏度</div><div class="value" id="gain-v">—</div></div>
+    <div class="row"><div class="label">圆点摆动幅度</div><div class="value" id="gain-v">—</div></div>
     <input type="range" id="gain" min="0.2" max="10" step="0.1" value="1">
     <div class="hint">车晃时圆点滑动的幅度倍数。觉得动得慢就调大，一般 1.5 ~ 3 之间比较明显。保存后约 2 秒生效，无需重启。</div>
     <button onclick="saveGain()">保存灵敏度</button>
   </div>
 
+  <div class="group-title">显示模式</div>
   <div class="card">
-    <div class="label" style="padding-bottom:8px">显示模式</div>
     <div class="seg">
       <button id="m2" onclick="setMode(2)">常驻显示</button>
       <button id="m1" onclick="setMode(1)">仅车辆运动</button>
     </div>
-    <div class="hint">「仅车辆运动」由加速度计识别：车持续动 8 秒后出现，停车 5 秒后消失。</div>
+    <div class="hint" style="padding: 0 0 8px">「仅车辆运动」由加速度计识别：车持续动 8 秒后出现，停车 5 秒后消失。</div>
   </div>
 
+  <div class="group-title">车辆识别参数</div>
   <details class="card">
-    <summary>车辆识别参数（进阶）</summary>
+    <summary style="cursor:pointer; font-weight:600; font-size:15px; padding:12px 0;">进阶阈值（展开调整）</summary>
     <div class="row"><div class="label">振动能量下限<div class="hint">motion_cues_veh_rms</div></div><input type="number" id="veh_rms" step="0.01"></div>
     <div class="row"><div class="label">低频占比下限<div class="hint">motion_cues_veh_low，调大更抗手抖</div></div><input type="number" id="veh_low" step="0.05"></div>
     <div class="row"><div class="label">陀螺上限<div class="hint">motion_cues_veh_rot，调小更严格</div></div><input type="number" id="veh_rot" step="0.01"></div>
@@ -102,7 +132,6 @@
     <div class="row"><div class="label">进入判定秒数<div class="hint">motion_cues_veh_hold</div></div><input type="number" id="veh_hold" step="1"></div>
     <button onclick="saveVeh()">保存车辆参数</button>
   </details>
-
   <div class="card">
     <div class="row" style="padding-bottom:6px">
       <div class="label">一键恢复默认参数<div class="hint">灵敏度 1.0×、车辆阈值回默认、关闭测试模式；不影响显示模式与功能开关</div></div>
@@ -110,23 +139,21 @@
     <button class="ghost" onclick="resetDefaults()">恢复默认参数</button>
   </div>
 
-  <details class="card">
-    <summary>测试（模拟车辆振动）</summary>
+  <div class="group-title">测试</div>
+  <div class="card">
     <div class="seg">
       <button onclick="setTest(0)">关闭</button>
       <button onclick="setTest(2)">模拟车辆</button>
       <button onclick="setTest(1)">正弦摆动</button>
     </div>
-    <div class="hint">不开车也能看效果：选「模拟车辆」后几秒内圆点应出现（仅车辆模式下）。测完记得关闭。</div>
+    <div class="hint" style="padding-bottom:6px">不开车也能看效果：选「模拟车辆」后几秒内圆点应出现（仅车辆模式下）。测完记得关闭。</div>
     <button class="ghost sm" onclick="setTest(3)">模拟走路（应拒绝）</button>
     <button class="ghost sm" onclick="setTest(4)">手持微动（应拒绝）</button>
-  </details>
+  </div>
 
-  <div class="card">
-    <div class="hint" style="margin:0">
-      参数保存在系统 Settings.Secure，卸载模块会被自动清理。改动由注入服务实时读取。
-      <br>手机当前静止时加速度计读数接近 0，属正常现象。
-    </div>
+  <div class="footer-hint">
+    参数保存在系统 Settings.Secure，卸载模块会被自动清理。改动由注入服务实时读取。<br>
+    手机当前静止时加速度计读数接近 0，属正常现象。
   </div>
 
   <div class="toast" id="toast"></div>
@@ -213,26 +240,6 @@ async function setMode(m) {
   refreshState();
 }
 
-// ---------- 恢复默认 ----------
-const DEFAULTS = {
-  motion_cues_gain: 1.0,
-  motion_cues_veh_rms: 0.12,
-  motion_cues_veh_low: 0.55,
-  motion_cues_veh_rot: 0.12,
-  motion_cues_veh_step: 0.45,
-  motion_cues_veh_hold: 8,
-  motion_cues_bridge_test: 0,
-};
-async function resetDefaults() {
-  if (!confirm('将灵敏度与车辆识别阈值全部恢复为默认值？\n（不影响显示模式与功能开关）')) return;
-  try {
-    for (const k in DEFAULTS) await putSetting(k, DEFAULTS[k]);
-    await Promise.all([loadGain(), loadVeh()]);
-    await refreshState();
-    toast('已恢复默认参数');
-  } catch (e) { toast('恢复失败：' + e.message); }
-}
-
 // ---------- 测试 ----------
 async function setTest(v) {
   await putSetting('motion_cues_bridge_test', v);
@@ -259,6 +266,26 @@ async function saveVeh() {
     if (!isNaN(v) && v > 0) await putSetting(k, v);
   }
   toast('车辆参数已保存，约 2 秒生效');
+}
+
+// ---------- 恢复默认 ----------
+const DEFAULTS = {
+  motion_cues_gain: 1.0,
+  motion_cues_veh_rms: 0.12,
+  motion_cues_veh_low: 0.55,
+  motion_cues_veh_rot: 0.12,
+  motion_cues_veh_step: 0.45,
+  motion_cues_veh_hold: 8,
+  motion_cues_bridge_test: 0,
+};
+async function resetDefaults() {
+  if (!confirm('将灵敏度与车辆识别阈值全部恢复为默认值？\n（不影响显示模式与功能开关）')) return;
+  try {
+    for (const k in DEFAULTS) await putSetting(k, DEFAULTS[k]);
+    await Promise.all([loadGain(), loadVeh()]);
+    await refreshState();
+    toast('已恢复默认参数');
+  } catch (e) { toast('恢复失败：' + e.message); }
 }
 
 // ---------- 初始化 ----------
