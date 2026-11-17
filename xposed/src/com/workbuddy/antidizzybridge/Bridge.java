@@ -162,7 +162,8 @@ public class Bridge implements IXposedHookLoadPackage {
         sReady = true;
         startRefresher();
         startReporter();
-        registerSensors();
+        createSensorListeners();
+        ensureSensors();
 
         log("ready: source=" + (sUseLinear ? "LINEAR_ACCELERATION" : "ACCELEROMETER")
                 + " gyro=" + (sGyro != null));
@@ -216,8 +217,13 @@ public class Bridge implements IXposedHookLoadPackage {
         }
     }
 
-    private void registerSensors() {
-        SensorEventListener l = new SensorEventListener() {
+    // ---- 传感器生命周期（v7.5：按需注册/注销，杜绝后台常开耗电） ----
+    private SensorEventListener sAccelL, sGyroL, sGravL;
+    private volatile boolean sAccelOn, sGyroOn, sGravOn;
+    private volatile int sAccelRateUs, sGyroRateUs;
+
+    private void createSensorListeners() {
+        sAccelL = new SensorEventListener() {
             @Override
             public void onSensorChanged(SensorEvent e) {
                 try {
@@ -229,7 +235,7 @@ public class Bridge implements IXposedHookLoadPackage {
             public void onAccuracyChanged(Sensor s, int a) {
             }
         };
-        SensorEventListener gl = new SensorEventListener() {
+        sGyroL = new SensorEventListener() {
             @Override
             public void onSensorChanged(SensorEvent e) {
                 try {
@@ -245,7 +251,7 @@ public class Bridge implements IXposedHookLoadPackage {
             public void onAccuracyChanged(Sensor s, int a) {
             }
         };
-        SensorEventListener gv = new SensorEventListener() {
+        sGravL = new SensorEventListener() {
             @Override
             public void onSensorChanged(SensorEvent e) {
                 try {
@@ -260,10 +266,81 @@ public class Bridge implements IXposedHookLoadPackage {
             public void onAccuracyChanged(Sensor s, int a) {
             }
         };
-        int rate = sUseLinear ? 10000 : 20000;
-        if (sAccel != null) sSm.registerListener(l, sAccel, rate);
-        if (sGyro != null) sSm.registerListener(gl, sGyro, 20000);
-        if (sGrav != null) sSm.registerListener(gv, sGrav, 20000);
+    }
+
+    /**
+     * 按「功能开关 + 显示模式 + 车辆状态」动态注册传感器，把常驻功耗压到最低：
+     *
+     *   功能关闭            → 全部注销，不再有任何传感器上报（v7.5 修复点）
+     *   常驻显示            → 加速度 100Hz；陀螺注销（圆点渲染不使用陀螺，省电大头）
+     *   仅车辆运动 · 车外    → 加速度 20Hz 低频巡逻；陀螺 20Hz
+     *   仅车辆运动 · 车内    → 加速度回升 100Hz（原厂低通按样本推进，必须保持采样率）；
+     *                          陀螺 20Hz
+     *
+     * 只在状态真正变化时才重新注册，避免反复开关传感器带来的抖动和开销。
+     * 注：常驻模式注销陀螺后，VehicleDetector 失去「陀螺否决」输入，状态日志中的
+     * 车辆判定会偏乐观——该模式下判定结果仅用于展示，不影响显示逻辑。
+     */
+    private void ensureSensors() {
+        SensorManager sm = sSm;
+        if (sm == null || sAccelL == null) return;
+
+        boolean wantAccel = enabled;
+        boolean wantGyro = enabled && mode != 2;
+        int accelRate = (mode == 1 && !detector.isInVehicle()) ? 50000 : 10000;
+        int gyroRate = 20000;
+
+        if (wantAccel) {
+            if (!sAccelOn || sAccelRateUs != accelRate) {
+                if (sAccelOn) sm.unregisterListener(sAccelL);
+                sm.registerListener(sAccelL, sAccel, accelRate);
+                sAccelOn = true;
+                sAccelRateUs = accelRate;
+            }
+        } else if (sAccelOn) {
+            sm.unregisterListener(sAccelL);
+            sAccelOn = false;
+        }
+
+        if (wantGyro && sGyro != null) {
+            if (!sGyroOn || sGyroRateUs != gyroRate) {
+                if (sGyroOn) sm.unregisterListener(sGyroL);
+                sm.registerListener(sGyroL, sGyro, gyroRate);
+                sGyroOn = true;
+                sGyroRateUs = gyroRate;
+            }
+        } else if (sGyroOn) {
+            sm.unregisterListener(sGyroL);
+            sGyroOn = false;
+            lastGyroVec[0] = 0f;
+            lastGyroVec[1] = 0f;
+            lastGyroVec[2] = 0f;
+            lastGyro = 0f;
+        }
+
+        if (sGrav != null) {
+            if (enabled) {
+                if (!sGravOn) {
+                    sm.registerListener(sGravL, sGrav, 20000);
+                    sGravOn = true;
+                }
+            } else if (sGravOn) {
+                sm.unregisterListener(sGravL);
+                sGravOn = false;
+            }
+        }
+
+        // 关闭瞬间把已有浮层透明度置 0（此后 onMotion 直接早退，不会再有机会走到 dispatch）
+        if (!enabled) hideAll();
+    }
+
+    /** 把所有已存在的圆点浮层隐藏（仅透明度操作，幂等） */
+    private void hideAll() {
+        Map<?, ?> map = sInstances;
+        if (map == null || map.isEmpty()) return;
+        for (Object ctrl : new ArrayList<Object>(map.values())) {
+            if (ctrl != null) applyAlpha(ctrl, 0f);
+        }
     }
 
     // ============================================================ 反射解析
@@ -425,6 +502,8 @@ public class Bridge implements IXposedHookLoadPackage {
                                 + " a=(" + r(lastAx) + "," + r(lastAy) + "," + r(lastAz) + ")"
                                 + " gain=" + r(gain) + "/" + r(gainY)
                                 + " gate=" + r(gate)
+                                + " sens=" + (sAccelOn ? (1000000 / Math.max(1, sAccelRateUs)) + "Hz" : "off")
+                                + "/" + (sGyroOn ? (1000000 / Math.max(1, sGyroRateUs)) + "Hz" : "off")
                                 + " gyro=" + r(lastGyro)
                                 + " alpha=" + sAppliedAlpha);
                     } catch (Throwable ignored) {
@@ -482,6 +561,9 @@ public class Bridge implements IXposedHookLoadPackage {
             detector.enterLowRatio = readFloat(c, "motion_cues_veh_low", 0.55f);
             detector.enterRot = readFloat(c, "motion_cues_veh_rot", 0.12f);
             detector.stepReject = readFloat(c, "motion_cues_veh_step", 0.45f);
+
+            // 开关/模式/车辆状态变化 → 重新评估传感器注册（关闭时全部注销省电）
+            ensureSensors();
         } catch (Throwable ignored) {
         }
     }
@@ -501,6 +583,7 @@ public class Bridge implements IXposedHookLoadPackage {
 
     private void onMotion(SensorEvent e) {
         if (!sReady || e == null || e.values == null) return;
+        if (!enabled) return;   // 功能关闭：传感器理论上已注销，此处双保险早退
         float[] v = e.values;
 
         long now = System.nanoTime();

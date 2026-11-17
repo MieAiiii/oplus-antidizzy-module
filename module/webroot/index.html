@@ -528,8 +528,10 @@ async function refreshState(manual) {
     const veh = /veh=true/.test(m);
     const modeM = m.match(/mode=(\d)/);
     const mode = modeM ? modeM[1] : '?';
-    document.getElementById('veh-state').textContent = veh ? '在车上' : '未检测到车辆';
-    document.getElementById('dot-veh').className = 'dot ' + (veh ? 'on' : '');
+    document.getElementById('veh-state').textContent = mode === '2'
+      ? '常驻模式（不判定）'
+      : (veh ? '在车上' : '未检测到车辆');
+    document.getElementById('dot-veh').className = 'dot ' + (veh && mode !== '2' ? 'on' : '');
     document.getElementById('mode-state').textContent = mode === '2' ? '常驻显示' : mode === '1' ? '仅车辆运动' : mode;
     syncRadios('m', mode === '1' ? '1' : mode === '2' ? '2' : null);
   } catch (e) {
